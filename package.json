@@ -1,5 +1,5 @@
 {
-  "name": "sprint",
+  "name": "sprint-es",
   "version": "0.0.18",
   "description": "Sprint - Quickly API",
   "main": "dist/cjs/index.js",

@@ -19,3 +19,17 @@
 | Feature                                                                | Status         |
 | ---------------------------------------------------------------------- | -------------- |
 | File-based dynamic routing system                                      | 🟢 Active      |
+| Pre-established security policies                                      | 🟢 Active      |
+| Native support for JSON, formatted and ready to use                    | 🟢 Active      |
+| CORS, Morgan, and similar modules preinstalled                         | 🟢 Active      |
+| Preconfigured health check and 404 error pages                         | 🟢 Active      |
+
+```ts
+import Sprint from "sprint-es";
+
+const app = new Sprint();
+
+app.get("/", (req, res) => res.send("Hello World!"));
+
+app.listen();
+```
