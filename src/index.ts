@@ -103,7 +103,7 @@ interface SprintOptions {
  */
 function defineMiddleware(config: MiddlewareConfig): MiddlewareConfig {
     return config;
-}
+};
 
 class Sprint {
     public app: Application;
@@ -125,7 +125,7 @@ class Sprint {
         this.port = port;
         this.routesPath = routesPath;
         this.middlewaresPath = middlewaresPath;
-        // Normalize prefix: ensure it starts with / and doesn't end with /
+        // Normalize prefix: ensure it starts with / and doesn't end with /.
         this.prefix = prefix ? ("/" + prefix.replace(/^\/+|\/+$/g, "")) : "";
         this.server = http.createServer(this.app);
         this.loadDefaults();
@@ -136,32 +136,20 @@ class Sprint {
     private async init(): Promise<void> {
         const callerDir = process.argv[1] ? path.dirname(process.argv[1]) : process.cwd();
 
-        // Load middlewares first
+        // Load middlewares first.
         try {
-            const middlewaresCandidate = path.isAbsolute(this.middlewaresPath)
-                ? this.middlewaresPath
-                : path.join(callerDir, this.middlewaresPath);
-
-            if (fs.existsSync(middlewaresCandidate) && fs.statSync(middlewaresCandidate).isDirectory()) {
-                await this.loadMiddlewares(middlewaresCandidate);
-            } else if (isVerbose) {
-                console.log(`[Sprint] Middlewares folder not found at: ${middlewaresCandidate}, skipping.`);
-            }
+            const middlewaresCandidate = path.isAbsolute(this.middlewaresPath) ? this.middlewaresPath : path.join(callerDir, this.middlewaresPath);
+            if (fs.existsSync(middlewaresCandidate) && fs.statSync(middlewaresCandidate).isDirectory()) await this.loadMiddlewares(middlewaresCandidate);
+            else if (isVerbose) console.log(`[Sprint] Middlewares folder not found at: ${middlewaresCandidate}, skipping.`);
         } catch (err) {
             console.error("[Sprint] Failed to load middlewares:", err);
         }
 
-        // Then load routes
+        // Then load routes.
         try {
-            const routesCandidate = path.isAbsolute(this.routesPath)
-                ? this.routesPath
-                : path.join(callerDir, this.routesPath);
-
-            if (fs.existsSync(routesCandidate) && fs.statSync(routesCandidate).isDirectory()) {
-                await this.loadRoutes(routesCandidate);
-            } else {
-                console.log(`[Sprint] Routes folder not found at: ${routesCandidate}, skipping route loading.`);
-            }
+            const routesCandidate = path.isAbsolute(this.routesPath) ? this.routesPath : path.join(callerDir, this.routesPath);
+            if (fs.existsSync(routesCandidate) && fs.statSync(routesCandidate).isDirectory()) await this.loadRoutes(routesCandidate);
+            else console.log(`[Sprint] Routes folder not found at: ${routesCandidate}, skipping route loading.`);
         } catch (err) {
             console.error("[Sprint] Failed to load routes:", err);
         }
@@ -205,14 +193,14 @@ class Sprint {
 
         const regex = new RegExp(`^${regexPattern}$`);
         return regex.test(normalizedRoute);
-    }
+    };
 
     /**
      * Check if a route matches any of the given patterns
      */
     private matchesPatterns(patterns: string[], routePath: string): boolean {
         return patterns.some(pattern => this.matchPattern(pattern, routePath));
-    }
+    };
 
     /**
      * Gets all matching middlewares for a given route path, sorted by priority
@@ -243,7 +231,7 @@ class Sprint {
         matched.sort((a, b) => a.priority - b.priority);
 
         return matched.map(m => m.handler);
-    }
+    };
 
     /**
      * Load all middleware files from the middlewares folder
@@ -278,7 +266,7 @@ class Sprint {
 
         // Sort middlewares by priority after loading
         this.loadedMiddlewares.sort((a, b) => (a.priority ?? 100) - (b.priority ?? 100));
-    }
+    };
 
     private loadHealthcheck(): void {
         const healthcheckXml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -310,17 +298,15 @@ class Sprint {
                         const router: ExpressRouter | undefined = module.default || module.router;
 
                         if (router && typeof router === "function" && router.stack && Array.isArray(router.stack)) {
-                            let routePath = "/" + path.relative(routesPath, filePath)
-                                .replace(/\.(ts|js)$/, "")
-                                .replace(/\\/g, "/");
+                            let routePath = "/" + path.relative(routesPath, filePath).replace(/\.(ts|js)$/, "").replace(/\\/g, "/");
 
                             if (routePath.endsWith("/index")) routePath = routePath.slice(0, -6) || "/";
 
-                            // Apply global prefix
+                            // Apply global prefix.
                             const fullRoute = this.prefix + (routePath === "/" ? "" : routePath);
                             const finalRoute = fullRoute || "/";
 
-                            // Get matching middlewares for this route (match against path without prefix for middleware patterns)
+                            // Get matching middlewares for this route (match against path without prefix for middleware patterns).
                             const routeMiddlewares = this.getMiddlewaresForRoute(routePath);
 
                             if (routeMiddlewares.length > 0) {
@@ -364,9 +350,7 @@ class Sprint {
                         console.error("[RateLimiter] Error checking limit:", err);
                         originalSend(body);
                     });
-                } else {
-                    originalSend(body);
-                }
+                } else originalSend(body);
             };
 
             res.send = sendWrapper as typeof res.send;
@@ -378,18 +362,16 @@ class Sprint {
     private applyPrefix(routePath: string): string {
         if (!this.prefix) return routePath;
         return this.prefix + (routePath.startsWith("/") ? routePath : "/" + routePath);
-    }
+    };
 
-    // HTTP Methods (prefix is applied automatically)
+    // HTTP Methods (prefix is applied automatically).
     public get(path: string, handler: Handler) { return this.app.get(this.applyPrefix(path), handler); }
     public post(path: string, handler: Handler) { return this.app.post(this.applyPrefix(path), handler); }
     public put(path: string, handler: Handler) { return this.app.put(this.applyPrefix(path), handler); }
     public delete(path: string, handler: Handler) { return this.app.delete(this.applyPrefix(path), handler); }
     public patch(path: string, handler: Handler) { return this.app.patch(this.applyPrefix(path), handler); }
     public use(pathOrHandler: string | Handler, maybeHandler?: Handler) {
-        if (typeof pathOrHandler === "string" && maybeHandler) {
-            return this.app.use(this.applyPrefix(pathOrHandler), maybeHandler);
-        }
+        if (typeof pathOrHandler === "string" && maybeHandler) return this.app.use(this.applyPrefix(pathOrHandler), maybeHandler);
         return this.app.use(pathOrHandler as Handler);
     };
 
