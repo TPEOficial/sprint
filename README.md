@@ -41,6 +41,8 @@ app.listen();
 In this example, we generate a route called random with subroutes inside it.
 ```
 📦example
+ ┣ 📂middlewares
+ ┃ ┗ 📜auth.js
  ┣ 📂routes
  ┃ ┗ 📜random.js
  ┗ 📜app.js
