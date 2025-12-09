@@ -23,6 +23,7 @@
 | Native support for JSON, formatted and ready to use                    | 🟢 Active      |
 | CORS, Morgan, and similar modules preinstalled                         | 🟢 Active      |
 | Preconfigured health check and 404 error pages                         | 🟢 Active      |
+| Anti-directory listing rate limiting system                            | 🟢 Active      |
 
 ```ts
 import Sprint from "sprint-es";

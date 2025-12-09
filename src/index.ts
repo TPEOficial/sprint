@@ -5,12 +5,19 @@ import path from "path";
 import morgan from "morgan";
 import dotenv from "dotenv";
 import { pathToFileURL } from "url";
+import { RateLimiter } from "toolkitify/rate-limit";
 import express, { Application, RequestHandler, Router as ExpressRouter, Request, Response, NextFunction } from "express";
 
 dotenv.config();
 
 let __filename: string;
 let __dirname: string;
+const isDev = process.argv.includes("--dev");
+const isVerbose = process.argv.includes("--verbose");
+
+const limiter = new RateLimiter({
+    logs: isDev || isVerbose
+});
 
 try {
     // @ts-ignore
@@ -129,7 +136,36 @@ class Sprint {
     };
 
     private loadNotFound(): void {
-        this.app.use((_req, res, _next) => res.status(404).send("Not Found"));
+        this.app.use((req, res, _next) => {
+            const originalSend = res.send.bind(res);
+            const sendWrapper = (body?: any) => {
+                if (res.statusCode === 404) {
+                    const key = `user:${req.ip}:404`;
+                    limiter.check({
+                        key,
+                        limit: 5,
+                        interval: "10s",
+                        storage: "memory"
+                    }).then((result: { success: boolean; remaining: number; limit: number; reset: number }) => {
+                        if (!result.success) {
+                            console.log(`[RateLimiter] 404 limit reached for ${req.ip}. Retry at ${new Date(result.reset).toLocaleTimeString()}`);
+                            res.status(429).send("Too many invalid requests. Try again later.");
+                        } else {
+                            console.log(`[RateLimiter] 404 allowed for ${req.ip}. Remaining: ${result.remaining}/${result.limit}`);
+                            originalSend(body);
+                        }
+                    }).catch((err: Error) => {
+                        console.error("[RateLimiter] Error checking limit:", err);
+                        originalSend(body);
+                    });
+                } else {
+                    originalSend(body);
+                }
+            };
+
+            res.send = sendWrapper as typeof res.send;
+            res.status(404).send("Not Found");
+        });
     };
 
     // HTTP Methods.

@@ -1,15 +1,16 @@
 {
   "name": "sprint-es",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "description": "Sprint - Quickly API",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/types/index.d.ts",
   "type": "module",
   "exports": {
-    "./*": {
-      "require": "./dist/cjs/**/*.cjs",
-      "import": "./dist/esm/**/*.js"
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "require": "./dist/cjs/index.cjs",
+      "import": "./dist/esm/index.js"
     }
   },
   "files": [
@@ -19,9 +20,7 @@
   ],
   "scripts": {
     "clean": "rimraf dist",
-    "build:cjs": "tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json",
-    "build:esm": "tsc -p tsconfig.esm.json && tsc-alias -p tsconfig.esm.json",
-    "build": "npm run clean && npm run build:cjs && npm run build:esm && node ./scripts/rename.js",
+    "build": "vite build",
     "start": "ts-node src/index.ts",
     "prepublishOnly": "npm run build",
     "test": "jest",
@@ -48,7 +47,8 @@
     "express": "^5.1.0",
     "morgan": "^1.10.1",
     "path": "^0.12.7",
-    "serve-favicon": "^2.5.1"
+    "serve-favicon": "^2.5.1",
+    "toolkitify": "^0.0.20"
   },
   "contributors": [
     "TPEOficial (https://github.com/TPEOficial)",
@@ -66,9 +66,9 @@
     "rimraf": "^6.0.1",
     "ts-jest": "^29.4.4",
     "ts-node": "^10.9.2",
-    "tsc-alias": "^1.8.16",
-    "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vite": "^6.4.1",
+    "vite-plugin-dts": "^4.5.4"
   },
   "prettier": {
     "tabWidth": 4,
