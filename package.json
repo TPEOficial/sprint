@@ -31,14 +31,10 @@
     "url": "https://github.com/TPEOficial/sprint-node"
   },
   "keywords": [
-    "cache",
-    "caching",
-    "toolkit",
+    "express",
+    "api",
     "sprint",
-    "rate-limit",
-    "server-only",
-    "client-only",
-    "optimistic-ui"
+    "rate-limit"
   ],
   "author": "TPEOficial LLC",
   "license": "Apache-2.0",

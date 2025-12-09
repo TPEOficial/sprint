@@ -33,3 +33,13 @@ app.get("/", (req, res) => res.send("Hello World!"));
 
 app.listen();
 ```
+
+#### File-based dynamic routing system 
+
+In this example, we generate a route called random with subroutes inside it.
+```
+📦example
+ ┣ 📂routes
+ ┃ ┗ 📜random.js
+ ┗ 📜app.js
+```
