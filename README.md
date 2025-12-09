@@ -19,6 +19,7 @@
 | Feature                                                                | Status         |
 | ---------------------------------------------------------------------- | -------------- |
 | File-based dynamic routing system                                      | 🟢 Active      |
+| Advanced middleware system                                             | 🟢 Active      |
 | Pre-established security policies                                      | 🟢 Active      |
 | Native support for JSON, formatted and ready to use                    | 🟢 Active      |
 | CORS, Morgan, and similar modules preinstalled                         | 🟢 Active      |
