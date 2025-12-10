@@ -4,9 +4,9 @@ import { createRateLimit } from "../../dist/esm/modules/rate-limit/index.js"; //
 const ratelimitIp = createRateLimit(3, "5s", "ip");
 
 export default defineMiddleware({
-    name: "admin",
+    name: "rate-limit",
     priority: 7, // Runs after logger.
-    include: "/admin/**",
+    include: "/**",
     handler: async (req, res, next) => {
         const { success, limit, remaining, reset } = await ratelimitIp.limit(req.ip);
 
