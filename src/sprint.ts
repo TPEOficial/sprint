@@ -230,6 +230,7 @@ export class Sprint {
                         key,
                         limit: 5,
                         interval: "10s",
+                        blockDuration: "1m",
                         storage: "memory"
                     }).then((result: { success: boolean; remaining: number; limit: number; reset: number }) => {
                         if (!result.success) {

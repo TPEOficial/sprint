@@ -1,7 +1,9 @@
 import { defineMiddleware } from "../../dist/esm/index.js"; // import { defineMiddleware } from "sprint-es";
 import { createRateLimit } from "../../dist/esm/modules/rate-limit/index.js"; // import { createRateLimit } from "sprint-es/rate-limit";
 
-const ratelimitIp = createRateLimit(3, "5s", "ip");
+const ratelimitIp = createRateLimit(3, "5s", "ip", {
+    blockDuration: "1m"
+});
 
 export default defineMiddleware({
     name: "rate-limit",
