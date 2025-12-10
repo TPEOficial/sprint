@@ -8,6 +8,7 @@ export default defineConfig({
         lib: {
             entry: {
                 index: resolve(__dirname, "src/index.ts"),
+                "modules/logger/index": resolve(__dirname, "src/modules/logger/index.ts"),
                 "modules/rate-limit/index": resolve(__dirname, "src/modules/rate-limit/index.ts")
             }
         },

@@ -1,4 +1,5 @@
-import { defineMiddleware } from "../../dist/esm/index.js";
+import { defineMiddleware } from "../../dist/esm/index.js"; // import { defineMiddleware } from "sprint-es";
+import { logger } from "../../dist/esm/modules/logger/index.js"; // import { logger } from "sprint-es/logger";
 
 export default defineMiddleware({
     name: "logger",
@@ -9,7 +10,7 @@ export default defineMiddleware({
 
         res.on("finish", () => {
             const duration = Date.now() - start;
-            console.log(`[Logger] ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+            logger.info(`${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
         });
 
         next();

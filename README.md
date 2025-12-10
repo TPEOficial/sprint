@@ -12,7 +12,7 @@
   <hr />
 </div>
 
-## Modules
+## Features
 
 **Sprint** provides different modules depending on the required use.
 
@@ -25,6 +25,7 @@
 | CORS, Morgan, and similar modules preinstalled                         | 🟢 Active      |
 | Preconfigured health check and 404 error pages                         | 🟢 Active      |
 | Anti-directory listing rate limiting system                            | 🟢 Active      |
+| Logger module included to reduce memory consumption                    | 🟢 Active      |
 
 ```ts
 import Sprint from "sprint-es";
@@ -128,3 +129,32 @@ export default defineMiddleware({
     }
 });
 ```
+
+More info: https://docs.tpeoficial.com/docs/toolkitify/rate-limit/introduction
+
+#### Use Logger
+
+Logger is designed to reduce memory consumption when using `console.logs`. Using it will improve the performance of your API.
+
+```ts
+import { defineMiddleware } from "sprint-es";
+import { logger } from "sprint-es/logger";
+
+export default defineMiddleware({
+    name: "logger",
+    priority: 5, // Runs first.
+    include: "/**", // All routes.
+    handler: (req, res, next) => {
+        const start = Date.now();
+
+        res.on("finish", () => {
+            const duration = Date.now() - start;
+            logger.info(`${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+        });
+
+        next();
+    }
+});
+```
+
+More info: https://docs.tpeoficial.com/docs/toolkitify/logger/introduction

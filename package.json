@@ -1,6 +1,6 @@
 {
   "name": "sprint-es",
-  "version": "0.0.22",
+  "version": "0.0.23",
   "description": "Sprint - Quickly API",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -11,6 +11,11 @@
       "types": "./dist/types/index.d.ts",
       "require": "./dist/cjs/index.cjs",
       "import": "./dist/esm/index.js"
+    },
+    "./logger": {
+      "types": "./dist/types/modules/logger/index.d.ts",
+      "require": "./dist/cjs/modules/logger/index.cjs",
+      "import": "./dist/esm/modules/logger/index.js"
     },
     "./rate-limit": {
       "types": "./dist/types/modules/rate-limit/index.d.ts",
@@ -53,7 +58,7 @@
     "morgan": "^1.10.1",
     "path": "^0.12.7",
     "serve-favicon": "^2.5.1",
-    "toolkitify": "^0.0.25"
+    "toolkitify": "^0.0.26"
   },
   "contributors": [
     "TPEOficial (https://github.com/TPEOficial)",
