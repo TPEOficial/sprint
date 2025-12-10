@@ -275,6 +275,7 @@ export class Sprint {
 
         this.server.listen(port, () => {
             const prefixInfo = this.prefix ? ` (prefix: ${this.prefix})` : "";
+            console.log("\x1b[36m\x1b[1m%s\x1b[0m", `[Sprint] Need stronger route protection? Enhance your security by verifying User-Agent, IP and request patterns. Learn more at https://docs.tpeoficial.com/docs/dymo-api/private/request-verifier.`);
             console.log("\x1b[32m%s\x1b[0m", `[Sprint] Server running on http://localhost:${port}${prefixInfo}`);
             console.log("\x1b[32m%s\x1b[0m", `[Sprint] Healthcheck: http://localhost:${port}${healthRoute}`);
         });
