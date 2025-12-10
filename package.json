@@ -1,6 +1,6 @@
 {
   "name": "sprint-es",
-  "version": "0.0.20",
+  "version": "0.0.21",
   "description": "Sprint - Quickly API",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -11,6 +11,11 @@
       "types": "./dist/types/index.d.ts",
       "require": "./dist/cjs/index.cjs",
       "import": "./dist/esm/index.js"
+    },
+    "./rate-limit": {
+      "types": "./dist/types/modules/rate-limit/index.d.ts",
+      "require": "./dist/cjs/modules/rate-limit/index.cjs",
+      "import": "./dist/esm/modules/rate-limit/index.js"
     }
   },
   "files": [
@@ -27,7 +32,7 @@
     "dev:example": "npm run build && node example/app.js"
   },
   "repository": {
-    "url": "https://github.com/TPEOficial/sprint-node"
+    "url": "https://github.com/TPEOficial/sprint"
   },
   "keywords": [
     "express",
@@ -38,7 +43,7 @@
   "author": "TPEOficial LLC",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/TPEOficial/sprint-node/issues"
+    "url": "https://github.com/TPEOficial/sprint/issues"
   },
   "homepage": "https://dymo.tpeoficial.com",
   "dependencies": {

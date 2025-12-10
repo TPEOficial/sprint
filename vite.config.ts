@@ -6,7 +6,10 @@ import { builtinModules } from "module";
 export default defineConfig({
     build: {
         lib: {
-            entry: resolve(__dirname, "src/index.ts")
+            entry: {
+                index: resolve(__dirname, "src/index.ts"),
+                "modules/rate-limit/index": resolve(__dirname, "src/modules/rate-limit/index.ts")
+            }
         },
         outDir: "dist",
         emptyOutDir: true,

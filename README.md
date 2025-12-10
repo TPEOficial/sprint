@@ -62,6 +62,20 @@ router.get("/", (req, res) => res.send("Hello World 2!"));
 export default router;
 ```
 
+#### Visual grouping of routes
+
+You can create folders with names in parentheses to group your routes more easily without affecting the path in the API URL.
+
+```
+📦routes
+ ┣ 📂(auth)
+ ┃ ┣ 📂(protected)
+ ┃ ┃ ┣ 📂settings
+ ┃ ┃ ┃ ┗ 📜index.js
+ ┃ ┃ ┗ 📜profile.js
+ ┃ ┗ 📜login.js
+```
+
 #### Define middleware
 
 We export a `defineMiddleware` function in a file with the name of your choice in the `middlewares` folder. **Sprint** will recognize it automatically.
