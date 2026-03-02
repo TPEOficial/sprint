@@ -17,7 +17,7 @@
 ## Quickstart
 
 ```bash
-npx -y create-sprint
+npx -y create-sprint@latest
 ```
 
 <details>

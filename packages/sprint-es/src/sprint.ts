@@ -115,7 +115,6 @@ export class Sprint {
                 console.log(`[Sprint] ⚠️ openapi.generateOnBuild is enabled but this option makes nothing for now`);
             }
 
-            this.server = http.createServer(this.app);
             this.loadDefaults();
             this.loadHealthcheck();
             this.routesLoaded = this.init();
@@ -417,6 +416,8 @@ public listen(callback?: () => void): void {
         
         const tryListen = (port: number): void => {
             triedPorts.push(port);
+            
+            this.server = http.createServer(this.app);
             
             this.server.listen(port, () => {
                 serverStarted = true;
