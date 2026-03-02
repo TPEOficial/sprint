@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 import { pathToFileURL } from "url";
 import { RateLimiter } from "toolkitify/rate-limit";
 import { isVerbose, matchesPatterns, stripRouteGroups } from "./utils";
-import { Handler, SprintOptions, MiddlewareConfig, LoadedMiddleware } from "./types";
+import { Handler, SprintOptions, SprintConfig, MiddlewareConfig, LoadedMiddleware } from "./types";
 import express, { Application, RequestHandler, Router as ExpressRouter, Request } from "express";
 import { AuthorizationSource, SprintRequest } from "./types";
 
@@ -15,13 +15,9 @@ const nodeEnv = process.env.NODE_ENV?.toLowerCase();
 const isDev = nodeEnv === "development";
 const isProd = nodeEnv === "production";
 
-if (isDev) {
-    dotenv.config({ path: ".env.development" });
-} else if (isProd) {
-    dotenv.config({ path: ".env.production" });
-} else {
-    dotenv.config();
-}
+if (isDev) dotenv.config({ path: ".env.development", quiet: true });
+else if (isProd) dotenv.config({ path: ".env.production", quiet: true });
+else dotenv.config({ quiet: true });
 
 const limiter = new RateLimiter({
     logs: isDev || isVerbose
@@ -30,46 +26,102 @@ const limiter = new RateLimiter({
 export const isDevelopment = isDev;
 export const isProduction = isProd;
 
+async function findProjectRoot(startDir: string): Promise<string | null> {
+    let currentDir = startDir;
+    while (currentDir !== path.parse(currentDir).root) {
+        const packageJsonPath = path.join(currentDir, "package.json");
+        if (fs.existsSync(packageJsonPath)) {
+            return currentDir;
+        }
+        currentDir = path.dirname(currentDir);
+    }
+    return null;
+}
+
+async function loadSprintConfig(): Promise<SprintConfig | null> {
+    const callerDir = process.argv[1] ? path.dirname(process.argv[1]) : process.cwd();
+    const projectRoot = await findProjectRoot(callerDir);
+    
+    if (!projectRoot) {
+        return null;
+    }
+
+    const configFiles = ["sprint.config.ts", "sprint.config.js"];
+    
+    for (const configFile of configFiles) {
+        const configPath = path.join(projectRoot, configFile);
+        if (fs.existsSync(configPath)) {
+            try {
+                const moduleUrl = pathToFileURL(configPath).href;
+                const config = await import(moduleUrl);
+                return config.default || config;
+            } catch (err) {
+                console.warn(`[Sprint] Failed to load config from ${configPath}:`, err);
+            }
+        }
+    }
+    
+    return null;
+}
+
 export class Sprint {
     public app: Application;
-    private port: string | number | null | undefined;
-    private routesPath: string;
-    private middlewaresPath: string;
-    private cronjobsPath: string;
-    private jsonLimit: string;
-    private urlEncodedLimit: string;
-    private prefix: string;
-    private routesLoaded: Promise<void>;
-    private server: http.Server;
+    private port: string | number | null | undefined = process.env.PORT;
+    private routesPath: string = "./routes";
+    private middlewaresPath: string = "./middlewares";
+    private cronjobsPath: string = "./cronjobs";
+    private jsonLimit: string = "50mb";
+    private urlEncodedLimit: string = "50mb";
+    private prefix: string = "";
+    private routesLoaded!: Promise<void>;
+    private server!: http.Server;
     private loadedMiddlewares: LoadedMiddleware[] = [];
+    private openapi: {
+        generateOnBuild: boolean;
+    } = { generateOnBuild: false };
 
-    constructor({
-        port = process.env.PORT,
-        routesPath = "./routes",
-        middlewaresPath = "./middlewares",
-        cronjobsPath = "./cronjobs",
-        jsonLimit = "50mb",
-        urlEncodedLimit = "50mb",
-        prefix = "",
-        autoListen = true
-    }: SprintOptions = {}) {
+    constructor() {
         this.app = express();
-        this.port = port;
-        this.routesPath = routesPath;
-        this.middlewaresPath = middlewaresPath;
-        this.cronjobsPath = cronjobsPath;
-        this.jsonLimit = jsonLimit;
-        this.urlEncodedLimit = urlEncodedLimit;
-        // Normalize prefix: ensure it starts with / and doesn't end with /.
-        this.prefix = prefix ? ("/" + prefix.replace(/^\/+|\/+$/g, "")) : "";
-        this.server = http.createServer(this.app);
-        this.loadDefaults();
-        this.loadHealthcheck();
-        this.routesLoaded = this.init();
+        
+        loadSprintConfig().then((config) => {
+            const defaults: SprintOptions = {
+                port: process.env.PORT,
+                routesPath: "./routes",
+                middlewaresPath: "./middlewares",
+                cronjobsPath: "./cronjobs",
+                jsonLimit: "50mb",
+                urlEncodedLimit: "50mb",
+                prefix: "",
+                autoListen: true,
+                openapi: {
+                    generateOnBuild: false
+                }
+            };
 
-        if (autoListen) {
-            this.routesLoaded.then(() => this.listen());
-        }
+            const finalConfig = { ...defaults, ...config };
+
+            this.port = finalConfig.port;
+            this.routesPath = finalConfig.routesPath || "./routes";
+            this.middlewaresPath = finalConfig.middlewaresPath || "./middlewares";
+            this.cronjobsPath = finalConfig.cronjobsPath || "./cronjobs";
+            this.jsonLimit = finalConfig.jsonLimit || "50mb";
+            this.urlEncodedLimit = finalConfig.urlEncodedLimit || "50mb";
+            this.prefix = finalConfig.prefix ? ("/" + finalConfig.prefix.replace(/^\/+|\/+$/g, "")) : "";
+            this.openapi = {
+                generateOnBuild: finalConfig.openapi?.generateOnBuild ?? false
+            };
+
+            if (this.openapi.generateOnBuild === true) {
+                console.log(`[Sprint] ⚠️ openapi.generateOnBuild is enabled but this option makes nothing for now`);
+            }
+
+            this.server = http.createServer(this.app);
+            this.loadDefaults();
+            this.loadHealthcheck();
+            this.routesLoaded = this.init();
+
+            if (finalConfig.autoListen) this.routesLoaded.then(() => this.listen());
+        });
     };
 
     private async init(): Promise<void> {
@@ -84,7 +136,7 @@ export class Sprint {
             console.error("[Sprint] Failed to load middlewares:", err);
         }
 
-// Then load routes.
+        // Then load routes.
         try {
             const routesCandidate = path.isAbsolute(this.routesPath) ? this.routesPath : path.join(callerDir, this.routesPath);
             if (fs.existsSync(routesCandidate) && fs.statSync(routesCandidate).isDirectory()) await this.loadRoutes(routesCandidate);
@@ -103,17 +155,17 @@ export class Sprint {
         }
     };
 
-private loadDefaults(): void {
+    private loadDefaults(): void {
         this.app.disable("x-powered-by");
 
         this.app.use((req: Request, res, next) => {
             const getAuthorization = (sources?: AuthorizationSource | AuthorizationSource[]): string | undefined => {
                 const defaultSources: AuthorizationSource[] = ["query:token", "headers:authorization"];
                 const sourceList = sources ? (Array.isArray(sources) ? sources : [sources]) : defaultSources;
-                
+
                 for (const source of sourceList) {
                     const [type, key] = source.split(":") as [string, string];
-                    
+
                     if (type === "query") {
                         const value = req.query[key];
                         if (typeof value === "string" && value.length > 0) return value;
@@ -123,11 +175,12 @@ private loadDefaults(): void {
                         if (Array.isArray(value) && value.length > 0 && typeof value[0] === "string" && value[0].length > 0) return value[0];
                     }
                 }
-                
+
                 return undefined;
             };
 
             req.sprint = { getAuthorization };
+            req.custom = {};
             next();
         });
 
@@ -140,7 +193,7 @@ private loadDefaults(): void {
             return next();
         });
 
-        this.app.set("port", this.port || 5000);
+        this.app.set("port", this.port || process.env.PORT || 5000);
         this.app.set("json spaces", 2);
         this.app.enable("trust proxy");
         this.app.set("trust proxy", true);
@@ -205,7 +258,7 @@ private loadDefaults(): void {
                             name,
                             filePath
                         });
-                        console.log(`[Sprint] Loaded middleware: ${name} (priority: ${config.priority ?? 100})`);
+                        if (isVerbose) console.log(`[Sprint] Loaded middleware: ${name} (priority: ${config.priority ?? 100})`);
                     }
                 } catch (err) {
                     console.warn(`[Sprint] Failed to load middleware ${filePath}:`, err);
@@ -263,10 +316,10 @@ private loadDefaults(): void {
 
                             if (routeMiddlewares.length > 0) {
                                 this.app.use(finalRoute, ...routeMiddlewares, router);
-                                console.log(`[Sprint] Loaded route: ${finalRoute} -> ${filePath} (with ${routeMiddlewares.length} middleware(s))`);
+                                if (isVerbose) console.log(`[Sprint] Loaded route: ${finalRoute} -> ${filePath} (with ${routeMiddlewares.length} middleware(s))`);
                             } else {
                                 this.app.use(finalRoute, router);
-                                console.log(`[Sprint] Loaded route: ${finalRoute} -> ${filePath}`);
+                                if (isVerbose) console.log(`[Sprint] Loaded route: ${finalRoute} -> ${filePath}`);
                             }
                         }
                     } catch (err) {
@@ -276,7 +329,7 @@ private loadDefaults(): void {
             }
         };
 
-await walkDir(routesPath);
+        await walkDir(routesPath);
     };
 
     private async loadCronJobs(cronjobsPath: string): Promise<void> {
@@ -290,7 +343,7 @@ await walkDir(routesPath);
                 try {
                     const moduleUrl = pathToFileURL(filePath).href;
                     await import(moduleUrl);
-                    console.log(`[Sprint] Loaded cronjob: ${file.replace(/\.(ts|js)$/, "")}`);
+                    if (isVerbose) console.log(`[Sprint] Loaded cronjob: ${file.replace(/\.(ts|js)$/, "")}`);
                 } catch (err) {
                     console.warn(`[Sprint] Failed to load cronjob ${filePath}:`, err);
                 }
@@ -342,21 +395,68 @@ await walkDir(routesPath);
     public put(path: string, handler: Handler) { return this.app.put(this.applyPrefix(path), handler); }
     public delete(path: string, handler: Handler) { return this.app.delete(this.applyPrefix(path), handler); }
     public patch(path: string, handler: Handler) { return this.app.patch(this.applyPrefix(path), handler); }
-    public use(pathOrHandler: string | Handler, maybeHandler?: Handler) {
-        if (typeof pathOrHandler === "string" && maybeHandler) return this.app.use(this.applyPrefix(pathOrHandler), maybeHandler);
+    public use(pathOrHandler: string | Handler | MiddlewareConfig, maybeHandler?: Handler) {
+        if (typeof pathOrHandler === "string" && maybeHandler) {
+            return this.app.use(this.applyPrefix(pathOrHandler), maybeHandler);
+        }
+        
+        if (pathOrHandler && typeof pathOrHandler === "object" && "handler" in pathOrHandler) {
+            const config = pathOrHandler as MiddlewareConfig;
+            const handlers = Array.isArray(config.handler) ? config.handler : [config.handler];
+            return this.app.use(...handlers);
+        }
+        
         return this.app.use(pathOrHandler as Handler);
     };
 
-    public listen(callback?: () => void): void {
-        const port = this.app.get("port");
-        const healthRoute = this.prefix ? `${this.prefix}/healthcheck` : "/healthcheck";
+public listen(callback?: () => void): void {
+        const isDev = process.env.NODE_ENV === "development";
+        const basePort = this.app.get("port") || 5000;
+        const triedPorts: number[] = [];
+        let serverStarted = false;
+        
+        const tryListen = (port: number): void => {
+            triedPorts.push(port);
+            
+            this.server.listen(port, () => {
+                serverStarted = true;
+                const prefixInfo = this.prefix ? this.prefix : "/";
+                const reset = "\x1b[0m";
+                const bold = "\x1b[1m";
+                const cyan = "\x1b[36m";
+                const green = "\x1b[32m";
+                const dim = "\x1b[2m";
 
-        this.server.listen(port, () => {
-            const prefixInfo = this.prefix ? ` (prefix: ${this.prefix})` : "";
-            console.log("\x1b[36m\x1b[1m%s\x1b[0m", `[Sprint] Need stronger route protection? Enhance your security by verifying User-Agent, IP and request patterns. Learn more at https://docs.tpeoficial.com/docs/dymo-api/private/request-verifier.`);
-            console.log("\x1b[32m%s\x1b[0m", `[Sprint] Server running on http://localhost:${port}${prefixInfo}`);
-            console.log("\x1b[32m%s\x1b[0m", `[Sprint] Healthcheck: http://localhost:${port}${healthRoute}`);
-        });
+                console.log("");
+                console.log(`   ${bold}${cyan}Sprint${reset}  ready to handle requests`);
+                console.log("");
+                console.log(`   ${dim}Local:${reset}        http://localhost:${bold}${port}${reset}`);
+                console.log(`   ${dim}Prefix:${reset}       ${bold}${prefixInfo}${reset}`);
+                console.log(`   ${dim}Healthcheck:${reset}  http://localhost:${port}${this.prefix}/healthcheck`);
+                console.log("");
+                console.log(`   ${dim}Tip: Need stronger route protection? Learn more at${reset}`);
+                console.log(`   ${dim}https://docs.tpeoficial.com/docs/dymo-api/private/request-verifier${reset}`);
+                console.log("");
+            });
+
+            this.server.on("error", (err: NodeJS.ErrnoException) => {
+                if (err.code === "EADDRINUSE" && isDev && !serverStarted) {
+                    const nextPort = triedPorts.length === 1 ? 3000 : triedPorts[triedPorts.length - 1] + 1;
+                    if (nextPort > 10000) {
+                        console.error(`❌ No available ports found after trying: ${triedPorts.join(", ")}`);
+                        process.exit(1);
+                    }
+                    console.log(`⚠️  Port ${port} in use, trying ${nextPort}...`);
+                    this.server.close();
+                    tryListen(nextPort);
+                } else if (!serverStarted) {
+                    console.error(`❌ Server error:`, err.message);
+                    process.exit(1);
+                }
+            });
+        };
+
+        tryListen(basePort);
 
         this.routesLoaded.then(() => {
             this.loadNotFound();

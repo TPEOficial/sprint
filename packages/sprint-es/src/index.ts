@@ -6,7 +6,7 @@ export { defineMiddleware } from "./middleware";
 export { __filename, __dirname } from "./utils";
 
 // Types
-export type { Handler, AsyncRequestHandler, MiddlewareConfig, SprintOptions, LoadedMiddleware, AuthorizationSource, SprintRequest } from "./types";
+export type { Handler, AsyncRequestHandler, MiddlewareConfig, SprintOptions, LoadedMiddleware, AuthorizationSource, SprintRequest, SprintResponse, NextFunction } from "./types";
 
 // Router helper
 export const Router = () => ExpressRouter();

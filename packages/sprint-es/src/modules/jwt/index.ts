@@ -1,34 +1,12 @@
-import crypto, { CipherGCM, DecipherGCM } from "crypto";
+import crypto from "crypto";
+import { base64UrlEncode, base64UrlDecode, decodeBase64Url } from "../utils";
 
-const ALGORITHM = "dir";
-const ENC_ALGORITHM = "A256GCM";
-const KEY_LENGTH = 32;
-const IV_LENGTH = 12;
-const AUTH_TAG_LENGTH = 16;
+const ALGORITHM = "ES256";
+const ENCRYPTION_ALGORITHM = "aes-256-gcm";
 
-function base64UrlEncode(buffer: Buffer): string {
-    return buffer.toString("base64url");
-}
+// ─── Base64url helpers ───────────────────────────────────────────────────────
 
-function base64UrlDecodeSafe(str: string): Buffer {
-    const pad = str.length % 4;
-    const padded = pad ? str + "=".repeat(4 - pad) : str;
-    return Buffer.from(padded.replace(/-/g, "+").replace(/_/g, "/"), "base64");
-}
-
-function decodeBase64Url(str: string): string {
-    return Buffer.from(str, "base64url").toString();
-}
-
-function importKey(key: string): Buffer {
-    if (key.length === 32) return Buffer.from(key, "utf8");
-    if (/^[A-Za-z0-9_-]+$/.test(key) && key.length >= 32) {
-        const hash = crypto.createHash("sha256");
-        hash.update(key);
-        return hash.digest();
-    }
-    return Buffer.from(key, "utf8").slice(0, KEY_LENGTH);
-}
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface JWTPayload {
     [key: string]: any;
@@ -41,150 +19,169 @@ export interface JWTOptions {
     audience?: string | string[];
 }
 
-export interface EncryptedJWTOptions {
-    secret: string;
-    expiresIn?: string | number;
-    issuer?: string;
+export interface KeyPair {
+    publicKey: string;
+    privateKey: string;
 }
 
-function encodeBase64Url(str: string): string {
-    return Buffer.from(str).toString("base64url");
-}
+// ─── Key generation ──────────────────────────────────────────────────────────
 
-export function sign(payload: JWTPayload, secret: string, options: JWTOptions = {}): string {
-    const header = { alg: "HS256", typ: "JWT" };
+export function generateKeyPair(): KeyPair {
+    const { publicKey, privateKey } = crypto.generateKeyPairSync("ec", {
+        namedCurve: "prime256v1",
+        publicKeyEncoding: { type: "spki", format: "pem" },
+        privateKeyEncoding: { type: "pkcs8", format: "pem" }
+    });
+    return { publicKey, privateKey };
+};
+
+// ─── Expiry parser ───────────────────────────────────────────────────────────
+
+function parseExpiry(expiresIn: string | number): number {
+    if (typeof expiresIn === "number") return expiresIn;
+    const units: Record<string, number> = {
+        s: 1,
+        m: 60,
+        h: 3600,
+        d: 86400,
+        w: 604800
+    };
+    const match = expiresIn.match(/^(\d+)([smhdw])$/);
+    if (!match) throw new Error(`Invalid expiresIn format: "${expiresIn}". Use e.g. "15m", "2h", "7d".`);
+    return parseInt(match[1]) * units[match[2]];
+};
+
+// ─── Claims builder ──────────────────────────────────────────────────────────
+
+function buildClaims(payload: JWTPayload, options: JWTOptions): JWTPayload {
     const now = Math.floor(Date.now() / 1000);
-    
-    const claims: JWTPayload = { ...payload };
-    if (options.expiresIn) {
-        claims.exp = typeof options.expiresIn === "number" ? now + options.expiresIn : now + parseInt(options.expiresIn);
-    }
+    const claims: JWTPayload = { ...payload, iat: now };
+    if (options.expiresIn !== undefined) claims.exp = now + parseExpiry(options.expiresIn);
     if (options.issuer) claims.iss = options.issuer;
     if (options.subject) claims.sub = options.subject;
     if (options.audience) claims.aud = options.audience;
-    claims.iat = now;
+    return claims;
+};
 
-    const encodedHeader = encodeBase64Url(JSON.stringify(header));
-    const encodedPayload = encodeBase64Url(JSON.stringify(claims));
+// ─── Payload encryption (AES-256-GCM) ────────────────────────────────────────
+// Format: base64url( iv[12] || authTag[16] || ciphertext )
 
-    const signature = crypto
-        .createHmac("sha256", secret)
-        .update(`${encodedHeader}.${encodedPayload}`)
-        .digest();
+function encryptPayload(plaintext: string, secret: string): string {
+    const key = crypto.scryptSync(secret, "sprint-jwt-salt", 32);
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
+    const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return base64UrlEncode(Buffer.concat([iv, tag, encrypted]));
+};
 
-    return `${encodedHeader}.${encodedPayload}.${base64UrlEncode(signature)}`;
-}
+function decryptPayload(data: string, secret: string): string {
+    const key = crypto.scryptSync(secret, "sprint-jwt-salt", 32);
+    const buf = base64UrlDecode(data);
+    if (buf.length < 28) throw new Error("Invalid encrypted payload.");
+    const iv = buf.subarray(0, 12);
+    const tag = buf.subarray(12, 28);
+    const ciphertext = buf.subarray(28);
+    const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, key, iv);
+    decipher.setAuthTag(tag);
+    return decipher.update(ciphertext).toString("utf8") + decipher.final("utf8");
+};
 
-export function verify(token: string, secret: string): JWTPayload | null {
+// ─── Core sign / verify ──────────────────────────────────────────────────────
+
+export function sign(payload: JWTPayload, privateKey: string, options: JWTOptions = {}): string {
+    const header = { alg: ALGORITHM, typ: "JWT" };
+    const claims = buildClaims(payload, options);
+
+    const encodedHeader = base64UrlEncode(Buffer.from(JSON.stringify(header)));
+    const encodedPayload = base64UrlEncode(Buffer.from(JSON.stringify(claims)));
+    const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+    const signer = crypto.createSign("SHA256");
+    signer.update(signingInput);
+    const signature = signer.sign(privateKey);
+
+    return `${signingInput}.${base64UrlEncode(signature)}`;
+};
+
+export function verify(token: string, publicKey: string): JWTPayload | null {
     try {
         const parts = token.split(".");
         if (parts.length !== 3) return null;
 
-        const [encodedHeader, encodedPayload, signature] = parts;
-        const expectedSig = crypto
-            .createHmac("sha256", secret)
-            .update(`${encodedHeader}.${encodedPayload}`)
-            .digest();
+        const [encodedHeader, encodedPayload, encodedSignature] = parts;
 
-        const sigBuffer = base64UrlDecodeSafe(signature);
-        if (!crypto.timingSafeEqual(sigBuffer, expectedSig)) return null;
+        const verifier = crypto.createVerify("SHA256");
+        verifier.update(`${encodedHeader}.${encodedPayload}`);
+        const isValid = verifier.verify(publicKey, base64UrlDecode(encodedSignature));
+        if (!isValid) return null;
 
-        const payload = JSON.parse(decodeBase64Url(encodedPayload));
-
-        if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+        const payload: JWTPayload = JSON.parse(decodeBase64Url(encodedPayload));
+        const now = Math.floor(Date.now() / 1000);
+        if (payload.exp !== undefined && payload.exp < now) return null;
 
         return payload;
     } catch {
         return null;
     }
-}
+};
 
-export function encrypt(payload: JWTPayload, secret: string, options: EncryptedJWTOptions = { secret }): string {
-    const now = Math.floor(Date.now() / 1000);
-    const key = importKey(secret);
+// ─── Encrypted sign / verify (JWE-like) ─────────────────────────────────────
+// The payload is AES-256-GCM encrypted before being embedded in the JWT.
+// Only someone with both the public key AND the encryption secret can read it.
+
+export function signEncrypted(payload: JWTPayload, privateKey: string, encryptionSecret: string, options: JWTOptions = {}): string {
+    const encrypted = encryptPayload(JSON.stringify(payload), encryptionSecret);
+    return `sprx_${sign({ enc: encrypted }, privateKey, options).slice(2)}`;
+};
+
+export function verifyEncrypted(token: string, publicKey: string, encryptionSecret: string): JWTPayload | null {
+    if (!token.startsWith("sprx_")) return null;
+    const verified = verify(`ey${token.slice(5)}`, publicKey);
     
-    const header = {
-        alg: ALGORITHM,
-        enc: ENC_ALGORITHM,
-        typ: "JWT"
-    };
-
-    const claims: JWTPayload = { ...payload };
-    if (options.expiresIn) {
-        claims.exp = now + parseInt(String(options.expiresIn));
-    }
-    if (options.issuer) claims.iss = options.issuer;
-    claims.iat = now;
-
-    const iv = crypto.randomBytes(IV_LENGTH);
-    const aad = Buffer.from(JSON.stringify(header));
-
-    const cipher = crypto.createCipheriv(ENC_ALGORITHM, key, iv) as CipherGCM;
-    cipher.setAAD(aad);
-
-    const plaintext = Buffer.from(JSON.stringify(claims));
-    const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-    const authTag = cipher.getAuthTag();
-
-    const encodedHeader = encodeBase64Url(JSON.stringify(header));
-    const encodedIv = base64UrlEncode(iv);
-    const encodedEncrypted = base64UrlEncode(encrypted);
-    const encodedAuthTag = base64UrlEncode(authTag);
-
-    return `${encodedHeader}.${encodedIv}.${encodedEncrypted}.${encodedAuthTag}`;
-}
-
-export function decrypt(token: string, secret: string): JWTPayload | null {
+    if (!verified?.enc || typeof verified.enc !== "string") return null;
     try {
-        const parts = token.split(".");
-        if (parts.length !== 4) return null;
-
-        const [encodedHeader, encodedIv, encodedEncrypted, encodedAuthTag] = parts;
-        const key = importKey(secret);
-
-        const header = JSON.parse(decodeBase64Url(encodedHeader));
-        if (header.alg !== ALGORITHM || header.enc !== ENC_ALGORITHM) return null;
-
-        const iv = base64UrlDecodeSafe(encodedIv);
-        const encrypted = base64UrlDecodeSafe(encodedEncrypted);
-        const authTag = base64UrlDecodeSafe(encodedAuthTag);
-        const aad = Buffer.from(encodedHeader);
-
-        const decipher = crypto.createDecipheriv(ENC_ALGORITHM, key, iv) as DecipherGCM;
-        decipher.setAAD(aad);
-        decipher.setAuthTag(authTag);
-
-        const plaintext = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-        const payload = JSON.parse(plaintext.toString());
-
-        if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
-
-        return payload;
+        return JSON.parse(decryptPayload(verified.enc, encryptionSecret));
     } catch {
         return null;
     }
-}
+};
 
-export function signEncrypted(payload: JWTPayload, secret: string, options: EncryptedJWTOptions = { secret }): string {
-    return encrypt(payload, secret, options);
-}
+// ─── Token pairs ─────────────────────────────────────────────────────────────
 
-export function verifyEncrypted(token: string, secret: string): JWTPayload | null {
-    return decrypt(token, secret);
-}
-
-export function createTokenPair(payload: JWTPayload, secret: string, options: JWTOptions = {}): { accessToken: string; refreshToken: string } {
-    const accessToken = sign(payload, secret, options);
-    const refreshPayload = { ...payload, type: "refresh" };
-    const refreshToken = sign(refreshPayload, secret, { ...options, expiresIn: "7d" });
-
+export function createTokenPair(
+    payload: JWTPayload,
+    privateKey: string,
+    options: JWTOptions = {}
+): { accessToken: string; refreshToken: string } {
+    const accessToken = sign(payload, privateKey, options);
+    const refreshToken = sign(
+        { sub: payload.sub ?? payload.id, type: "refresh" },
+        privateKey,
+        { expiresIn: "7d", issuer: options.issuer }
+    );
     return { accessToken, refreshToken };
 }
 
-export function verifyTokenPair(token: string, secret: string): { accessToken: JWTPayload | null; refreshToken: JWTPayload | null } {
-    const [accessToken, refreshToken] = token.split(".");
+export function verifyTokenPair(
+    accessToken: string,
+    refreshToken: string,
+    publicKey: string
+): { accessToken: JWTPayload | null; refreshToken: JWTPayload | null } {
     return {
-        accessToken: verify(accessToken, secret),
-        refreshToken: verify(refreshToken, secret)
+        accessToken: verify(accessToken, publicKey),
+        refreshToken: verify(refreshToken, publicKey)
     };
-}
+};
+
+// ─── Env helpers ─────────────────────────────────────────────────────────────
+let publicKey = process.env.JWT_PUBLIC_KEY;
+let privateKey = process.env.JWT_PRIVATE_KEY;
+let encryptionSecret = process.env.JWT_ENCRYPTION_SECRET;
+
+export function getJwtFromEnv(): { publicKey: string; privateKey: string; encryptionSecret: string } {
+    if (!publicKey || !privateKey || !encryptionSecret) throw new Error("JWT keys not configured. Run 'npm run generate:keys' and add the keys to your .env file.");
+
+    const normalize = (k: string) => k.replace(/^['"]|['"]$/g, "").replace(/\\n/g, "\n");
+    return { publicKey: normalize(publicKey), privateKey: normalize(privateKey), encryptionSecret };
+};

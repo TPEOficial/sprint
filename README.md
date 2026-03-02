@@ -1,7 +1,7 @@
 <div align="center">
   <br />
   <img src="./docs/images/banner.png" alt="Sprint Banner" />
-  <h1>Sprint — Edge Server</h1>
+  <h1>Sprint — Edge Server [EXPERIMENTAL]</h1>
   <p>A next-generation backend framework that enables instant API development with a single command, enforcing clean structure by default and eliminating repetitive code while keeping projects fast, organized, and scalable.</p>
   <img src="https://img.shields.io/badge/TypeScript-purple?style=for-the-badge&logo=typescript&logoColor=white"/> 
   <a href="https://github.com/TPEOficial"> <img alt="GitHub" src="https://img.shields.io/badge/GitHub-purple?style=for-the-badge&logo=github&logoColor=white"/></a>
@@ -19,6 +19,48 @@
 ```bash
 npx -y create-sprint
 ```
+
+<details>
+  <summary>View auto-generated project structure</summary>
+
+```
+ 📂<your-app>
+ ┣ 📂node_modules (It depends on specs)
+ ┣ 📂src
+ ┃ ┣ 📂config
+ ┃ ┃ ┣ 📜clients.{ts.js}
+ ┃ ┃ ┗ 📜index.{ts.js}
+ ┃ ┣ 📂controllers
+ ┃ ┃ ┣ 📜admin.{ts.js}
+ ┃ ┃ ┗ 📜home.{ts.js}
+ ┃ ┣ 📂cronjobs
+ ┃ ┃ ┗ 📜example.{ts.js}
+ ┃ ┣ 📂middlewares
+ ┃ ┃ ┣ 📜.gitkeep
+ ┃ ┃ ┣ 📜auth.internal.{ts.js}
+ ┃ ┃ ┗ 📜auth.user.{ts.js}
+ ┃ ┣ 📂routes
+ ┃ ┃ ┣ 📜admin.{ts.js}
+ ┃ ┃ ┗ 📜home.{ts.js}
+ ┃ ┣ 📂schemas
+ ┃ ┃ ┣ 📜admin.{ts.js}
+ ┃ ┃ ┗ 📜home.{ts.js}
+ ┃ ┗ 📜app.{ts.js}
+ ┣ 📜.dockerignore (It depends on specs)
+ ┣ 📜.env.development
+ ┣ 📜.env.development.example
+ ┣ 📜.env.production
+ ┣ 📜.env.production.example
+ ┣ 📜.gitignore
+ ┣ 📜docker-compose.yml (It depends on specs)
+ ┣ 📜Dockerfile (It depends on specs)
+ ┣ 📜package.json
+ ┣ 📜sprint.config.{ts.js}
+ ┣ 📜tsconfig.json (It depends on specs)
+ ┗ 📜vite.config.{ts.js}
+```
+
+</details>
 
 This will create a new Sprint project in the current directory with:
 - TypeScript configuration

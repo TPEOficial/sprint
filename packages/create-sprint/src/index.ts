@@ -1,10 +1,11 @@
-import { execSync } from "child_process";
+import { spawn } from "child_process";
 import { existsSync } from "fs";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile as fsWriteFile } from "fs/promises";
 import { join } from "path";
-import { input, select, confirm } from "@inquirer/prompts";
+import color from "picocolors";
+import * as p from "@clack/prompts";
 import { validateProjectName } from "./validators.js";
-import { getTypeScriptPackageJson, getJavaScriptPackageJson, getTsConfig, getViteConfig, getMainFile, getHomeRoute, getAdminRoute, getHomeController, getAdminController, getAuthMiddleware, getHomeSchema, getAdminSchema, getDockerfile, getDockerCompose, getGitignore, getDockerIgnore, getSprintConfigFile, getEnvDevelopment, getEnvProduction, getExampleCronJob } from "./generators.js";
+import { getTypeScriptPackageJson, getJavaScriptPackageJson, getTsConfig, getViteConfig, getMainFile, getHomeRoute, getAdminRoute, getHomeController, getAdminController, getEnvExample, getInternalAuthMiddleware, getUserAuthMiddleware, getHomeSchema, getAdminSchema, getDockerfile, getDockerCompose, getGitignore, getDockerIgnore, getSprintConfigFile, getEnvDevelopment, getEnvProduction, getExampleCronJob } from "./generators.js";
 
 export interface CLIOptions {
     projectName?: string;
@@ -15,65 +16,132 @@ export interface CLIOptions {
     skipPrompts?: boolean;
 }
 
+export async function writeFile(path: string, content: string, options?: any) {
+    if (typeof content === "string") content = content.trimEnd();
+    await fsWriteFile(path, content, options);
+};
+
 export async function runCLI(args: string[]) {
     const options = parseArgs(args);
 
-    console.log("\n🚀 Welcome to Sprint - Quickly API Framework\n");
+    p.intro("Sprint — Quickly API Framework");
 
-    let projectName = options.projectName;
-    let language = options.language;
-    const telemetry = options.telemetry;
-    const useDocker = options.docker;
+    p.intro(`${color.bgCyan(color.black(' create-sprint-app '))}`);
 
-    if (!projectName) {
-        projectName = await getProjectName();
+    let config: {
+        projectName: string;
+        language: "typescript" | "javascript";
+        telemetry: string;
+        docker: boolean;
+    };
+
+    if (options.skipPrompts) {
+        config = {
+            projectName: options.projectName || "sprint-app",
+            language: options.language || "typescript",
+            telemetry: options.telemetry || "none",
+            docker: options.docker || false,
+        };
+    } else {
+        config = await p.group(
+            {
+                projectName: () =>
+                    p.text({
+                        message: "Project name:",
+                        placeholder: "my-api",
+                        validate: (v) => validateProjectName(v) || undefined,
+                    }),
+
+                language: () =>
+                    p.select({
+                        message: "Language:",
+                        options: [
+                            { value: "typescript", label: "TypeScript", hint: "recommended" },
+                            { value: "javascript", label: "JavaScript" },
+                        ],
+                    }),
+
+                telemetry: () =>
+                    p.select({
+                        message: "Error tracking:",
+                        options: [
+                            { value: "none", label: "None" },
+                            { value: "sentry", label: "Sentry", hint: "free tier available" },
+                            { value: "glitchtip", label: "GlitchTip", hint: "self-hostable" },
+                            { value: "discord", label: "Discord Webhook", hint: "sends to a channel" },
+                        ],
+                    }),
+
+                docker: () =>
+                    p.confirm({ message: "Add Docker support?", initialValue: false }),
+            },
+            {
+                onCancel: () => {
+                    p.cancel("Cancelled.");
+                    process.exit(0);
+                },
+            }
+        );
     }
 
-    const error = validateProjectName(projectName);
-    if (error) {
-        console.error(`\n❌ Error: ${error}\n`);
-        process.exit(1);
-    }
+    const targetDir = config.projectName === "." ? process.cwd() : join(process.cwd(), config.projectName);
 
-    if (!language) {
-        language = await selectLanguage();
-    }
-
-    console.log(`\n✅ Creating Sprint project: ${projectName === "." ? "current directory" : projectName} with ${language === "typescript" ? "TypeScript" : "JavaScript"}\n`);
-
-    await createProject(projectName, language, telemetry, useDocker);
-
-    console.log("\n✅ Project created successfully!");
+    const s = p.spinner();
+    s.start("Creating project");
+    await createProject(
+        config.projectName,
+        config.language,
+        config.telemetry,
+        config.docker,
+    );
+    s.stop("Project created");
 
     let installDeps = true;
     if (options.skipInstall) {
         installDeps = false;
-    } else {
-        installDeps = await confirm({
-            message: "Do you want to install dependencies now?",
-            default: true,
-        });
+    } else if (!options.skipPrompts) {
+        installDeps = await p.confirm({ message: "Install dependencies now?", initialValue: true }) as boolean;
     }
 
     if (installDeps) {
-        console.log("\n📦 Installing dependencies...\n");
-        const targetDir = projectName === "." ? process.cwd() : join(process.cwd(), projectName);
+        const s2 = p.spinner();
+        s2.start("Installing dependencies");
         try {
-            execSync("npm install", { cwd: targetDir, stdio: "inherit" });
-            console.log("\n✅ Dependencies installed successfully!");
-        } catch {
-            console.error("\n❌ Error installing dependencies. Please run 'npm install' manually.");
+            await new Promise<void>((resolve, reject) => {
+                const child = spawn("npm", ["install"], {
+                    cwd: targetDir,
+                    stdio: "inherit",
+                    shell: true
+                });
+                child.on("close", (code) => {
+                    if (code === 0) resolve();
+                    else reject(new Error(`npm install exited with code ${code}`));
+                });
+                child.on("error", (err) => {
+                    p.cancel(`Failed to run npm install: ${err.message}`);
+                    reject(err);
+                });
+            });
+            s2.stop("Dependencies installed");
+        } catch (err) {
+            s2.stop("Install failed — run npm install manually");
+            console.error(err);
         }
     }
 
-    console.log("\n📦 Next steps:");
-    const cdCmd = projectName === "." ? "" : `cd ${projectName} && `;
-    if (!installDeps) {
-        console.log(`   ${cdCmd}npm install`);
-    }
-    console.log(`   ${cdCmd}npm run dev`);
-    console.log("\n");
-}
+    const cdCmd = config.projectName === "." ? "" : `cd ${config.projectName} && `;
+    p.note(
+        [
+            !installDeps ? `${cdCmd}npm install` : "",
+            `${cdCmd}npm run dev`,
+        ]
+            .filter(Boolean)
+            .join("\n"),
+        "Next steps"
+    );
+
+    p.outro("Ready. Happy shipping.");
+};
 
 function parseArgs(args: string[]): CLIOptions {
     const options: CLIOptions = {};
@@ -103,93 +171,21 @@ function parseArgs(args: string[]): CLIOptions {
     return options;
 };
 
-async function getProjectName(): Promise<string> {
-    const name = await input({
-        message: "Enter project name:",
-        validate: (value) => {
-            return validateProjectName(value) || true;
-        }
-    });
-
-    return name;
-};
-
-async function selectLanguage(): Promise<"typescript" | "javascript"> {
-    const language = await select({
-        message: "Select your preferred language:",
-        choices: [
-            {
-                name: "TypeScript",
-                value: "typescript",
-                description: "Recommended - Type safety and better developer experience",
-            },
-            {
-                name: "JavaScript",
-                value: "javascript",
-                description: "Vanilla JavaScript for simpler projects",
-            }
-        ]
-    });
-
-    return language as "typescript" | "javascript";
-};
-
-async function selectTelemetry(): Promise<"none" | "sentry" | "glitchtip" | "discord"> {
-    const telemetry = await select({
-        message: "Select error tracking/telemetry solution:",
-        choices: [
-            {
-                name: "None",
-                value: "none",
-                description: "No error tracking integration",
-            },
-            {
-                name: "Sentry",
-                value: "sentry",
-                description: "Full-featured error tracking (free tier available)",
-            },
-            {
-                name: "GlitchTip",
-                value: "glitchtip",
-                description: "Simple error tracking, can be self-hosted",
-            },
-            {
-                name: "Discord Webhook",
-                value: "discord",
-                description: "Send error notifications to Discord channel",
-            }
-        ]
-    });
-
-    return telemetry as "none" | "sentry" | "glitchtip" | "discord";
-};
-
 async function createProject(
     projectName: string,
     language: "typescript" | "javascript",
-    telemetryArg?: string,
-    useDockerArg?: boolean
+    telemetry: string,
+    useDocker: boolean
 ) {
     const isCurrentDir = projectName === ".";
     const targetDir = isCurrentDir ? process.cwd() : join(process.cwd(), projectName);
 
     if (!isCurrentDir && existsSync(targetDir)) {
-        console.error(`Error: Directory ${projectName} already exists`);
+        p.cancel(`Directory "${projectName}" already exists.`);
         process.exit(1);
     }
 
     if (!isCurrentDir) await mkdir(targetDir, { recursive: true });
-
-    let telemetry = telemetryArg || "none";
-    if (!telemetryArg) telemetry = await selectTelemetry();
-
-    let useDocker = useDockerArg || false;
-    if (!useDockerArg) {
-        useDocker = await confirm({
-            message: "Do you want to add Docker support?",
-            default: false,
-        });
-    }
 
     let pkgJson;
     if (language === "typescript") pkgJson = getTypeScriptPackageJson(projectName, telemetry);
@@ -211,6 +207,15 @@ async function createProject(
     await mkdir(join(srcDir, "controllers"), { recursive: true });
     await mkdir(join(srcDir, "schemas"), { recursive: true });
     await mkdir(join(srcDir, "cronjobs"), { recursive: true });
+    await mkdir(join(srcDir, "config"), { recursive: true });
+
+    if (language === "typescript") {
+        await writeFile(join(srcDir, "config", "index.ts"), "");
+        await writeFile(join(srcDir, "config", "clients.ts"), "");
+    } else {
+        await writeFile(join(srcDir, "config", "index.js"), "");
+        await writeFile(join(srcDir, "config", "clients.js"), "");
+    }
 
     await writeFile(join(srcDir, "middlewares", ".gitkeep"), "");
 
@@ -222,18 +227,19 @@ async function createProject(
     await writeFile(join(srcDir, "controllers", "home." + (language === "typescript" ? "ts" : "js")), getHomeController(language));
     await writeFile(join(srcDir, "controllers", "admin." + (language === "typescript" ? "ts" : "js")), getAdminController(language));
 
-    await writeFile(join(srcDir, "middlewares", "auth." + (language === "typescript" ? "ts" : "js")), getAuthMiddleware(language));
+    await writeFile(join(srcDir, "middlewares", "auth.internal." + (language === "typescript" ? "ts" : "js")), getInternalAuthMiddleware(language));
+    await writeFile(join(srcDir, "middlewares", "auth.user." + (language === "typescript" ? "ts" : "js")), getUserAuthMiddleware(language));
 
     await writeFile(join(srcDir, "schemas", "home." + (language === "typescript" ? "ts" : "js")), getHomeSchema(language));
     await writeFile(join(srcDir, "schemas", "admin." + (language === "typescript" ? "ts" : "js")), getAdminSchema(language));
 
     await writeFile(join(srcDir, "cronjobs", "example." + (language === "typescript" ? "ts" : "js")), getExampleCronJob(language));
 
-    await writeFile(join(targetDir, ".env.development.example"), getEnvDevelopment(telemetry));
-    await writeFile(join(targetDir, ".env.production.example"), getEnvProduction(telemetry));
+    await writeFile(join(targetDir, ".env.development.example"), getEnvExample(telemetry));
+    await writeFile(join(targetDir, ".env.production.example"), getEnvExample(telemetry));
 
-    await writeFile(join(targetDir, ".env.development"), "");
-    await writeFile(join(targetDir, ".env.production"), "");
+    await writeFile(join(targetDir, ".env.development"), getEnvDevelopment(telemetry));
+    await writeFile(join(targetDir, ".env.production"), getEnvProduction(telemetry));
 
     await writeFile(join(targetDir, ".gitignore"), getGitignore());
 

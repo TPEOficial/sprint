@@ -12,10 +12,14 @@ export interface SprintRequest {
     getAuthorization: (sources?: AuthorizationSource | AuthorizationSource[]) => string | undefined;
 }
 
+export type SprintResponse = Response;
+
 declare global {
     namespace Express {
         interface Request {
             sprint: SprintRequest;
+            /* Customized item where you can store anything you need during the request. */
+            custom: any;
         }
     }
 }
@@ -75,4 +79,24 @@ export interface SprintOptions {
     prefix?: string;
     /** Auto-start the server. Default: true */
     autoListen?: boolean;
+
+    openapi?: {
+        generateOnBuild?: boolean;
+    };
 }
+
+export interface SprintConfig {
+    port?: string | number | null;
+    routesPath?: string;
+    middlewaresPath?: string;
+    cronjobsPath?: string;
+    jsonLimit?: string;
+    urlEncodedLimit?: string;
+    prefix?: string;
+    autoListen?: boolean;
+    openapi?: {
+        generateOnBuild?: boolean;
+    };
+}
+
+export type { NextFunction } from "express";

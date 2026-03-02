@@ -1,8 +1,22 @@
+import * as crypto from "node:crypto";
+
+export interface JWTKeys {
+    publicKey: string;
+    privateKey: string;
+}
+
+export function generateJWTKeys(): JWTKeys {
+    const keys = crypto.generateKeyPairSync("rsa", {
+        modulusLength: 4096,
+        publicKeyEncoding: { type: "spki", format: "pem" },
+        privateKeyEncoding: { type: "pkcs8", format: "pem" }
+    }) as unknown as { publicKey: string; privateKey: string };
+    return keys;
+}
+
 export function getTypeScriptPackageJson(name: string, telemetry: string) {
     const deps: Record<string, string> = {
-        "sprint-es": "^0.0.35",
-        "node-cron": "^3.0.3",
-        dotenv: "^17.0.0",
+        "sprint-es": "^0.0.54"
     };
 
     const devDeps: Record<string, string> = {
@@ -26,6 +40,7 @@ export function getTypeScriptPackageJson(name: string, telemetry: string) {
             build: "sprint-es build",
             start: "sprint-es start",
             dev: "sprint-es dev",
+            "generate:keys": "sprint-es generate-keys"
         },
         dependencies: deps,
         devDependencies: devDeps,
@@ -34,9 +49,7 @@ export function getTypeScriptPackageJson(name: string, telemetry: string) {
 
 export function getJavaScriptPackageJson(name: string, telemetry: string) {
     const deps: Record<string, string> = {
-        "sprint-es": "^0.0.35",
-        "node-cron": "^3.0.3",
-        dotenv: "^17.0.0",
+        "sprint-es": "^0.0.54"
     };
 
     if (telemetry === "sentry" || telemetry === "glitchtip") {
@@ -55,18 +68,20 @@ export function getJavaScriptPackageJson(name: string, telemetry: string) {
             build: "sprint-es build",
             start: "sprint-es start",
             dev: "sprint-es dev",
+            "generate:keys": "sprint-es generate-keys"
         },
-        dependencies: deps,
+        dependencies: deps
     };
 }
 
 export function getTsConfig() {
     return JSON.stringify({
         compilerOptions: {
-            target: "ES2020",
-            module: "ESNext",
-            moduleResolution: "bundler",
-            lib: ["ES2020"],
+            target: "ES2022",
+            module: "NodeNext",
+            moduleResolution: "NodeNext",
+            lib: ["ES2022"],
+            types: ["node"],
             outDir: "./dist",
             rootDir: "./src",
             strict: true,
@@ -77,7 +92,6 @@ export function getTsConfig() {
             declaration: true,
             declarationMap: true,
             sourceMap: true,
-            tabWidth: 4,
             baseUrl: ".",
             paths: {
                 "@/*": ["./src/*"]
@@ -132,22 +146,24 @@ export function getHomeRoute(language: string) {
     if (language === "typescript") {
         return `import { Router } from "sprint-es";
 import { homeSchema } from "@/schemas/home";
-import { homeController } from "@/controllers/home";
+import { homeController, jwtValidateController } from "@/controllers/home";
 
 const router = Router();
 
 router.get("/", homeSchema, homeController);
+router.post("/me", jwtValidateController);
 
 export default router;
 `;
     }
     return `import { Router } from "sprint-es";
 import { homeSchema } from "../schemas/home.js";
-import { homeController } from "../controllers/home.js";
+import { homeController, jwtValidateController } from "../controllers/home.js";
 
 const router = Router();
 
 router.get("/", homeSchema, homeController);
+router.post("/me", jwtValidateController);
 
 export default router;
 `;
@@ -156,25 +172,27 @@ export default router;
 export function getAdminRoute(language: string) {
     if (language === "typescript") {
         return `import { Router } from "sprint-es";
-import { adminSchema } from "@/schemas/admin";
-import { adminController, adminUsersController } from "@/controllers/admin";
+import { adminSchema, jwtGenerateSchema } from "@/schemas/admin";
+import { adminController, adminUsersController, jwtGenerateController } from "@/controllers/admin";
 
 const router = Router();
 
 router.get("/", adminSchema, adminController);
 router.get("/users", adminSchema, adminUsersController);
+router.post("/jwt/generate", jwtGenerateSchema, jwtGenerateController);
 
 export default router;
 `;
     }
     return `import { Router } from "sprint-es";
-import { adminSchema } from "../schemas/admin.js";
-import { adminController, adminUsersController } from "../controllers/admin.js";
+import { adminSchema, jwtGenerateSchema } from "../schemas/admin.js";
+import { adminController, adminUsersController, jwtGenerateController } from "../controllers/admin.js";
 
 const router = Router();
 
 router.get("/", adminSchema, adminController);
 router.get("/users", adminSchema, adminUsersController);
+router.post("/jwt/generate", jwtGenerateSchema, jwtGenerateController);
 
 export default router;
 `;
@@ -182,66 +200,107 @@ export default router;
 
 export function getHomeController(language: string) {
     if (language === "typescript") {
-        return `import { Handler } from "sprint-es";
+        return `import { Handler, SprintRequest, SprintResponse } from "sprint-es";
+import { verifyEncrypted, getJwtFromEnv } from "sprint-es/jwt";
 
-export const homeController: Handler = (req, res) => {
+export const homeController: Handler = (req: SprintRequest, res: SprintResponse) => {
     res.json({
         message: "Hello World",
         status: "ok"
     });
 };
+
+export const jwtValidateController: Handler = (req: SprintRequest, res: SprintResponse) => {
+    return res.json(req.custom.user);
+};
 `;
     }
-    return `import { Handler } from "sprint-es";
+    return `import { Handler, SprintRequest, SprintResponse } from "sprint-es";
+import { verifyEncrypted, getJwtFromEnv } from "sprint-es/jwt";
 
-export const homeController = (req, res) => {
+export const homeController = (req: SprintRequest, res: SprintResponse) => {
     res.json({
         message: "Hello World",
         status: "ok"
     });
+};
+
+export const jwtValidateController = (req: SprintRequest, res: SprintResponse) => {
+    return res.json(req.custom.user);
 };
 `;
 }
 
 export function getAdminController(language: string) {
     if (language === "typescript") {
-        return `import { Handler } from "sprint-es";
+        return `import { Handler, SprintRequest, SprintResponse } from "sprint-es";
+import { signEncrypted, getJwtFromEnv } from "sprint-es/jwt";
 
-export const adminController: Handler = (req, res) => {
+export const adminController: Handler = (req: SprintRequest, res: SprintResponse) => {
     res.json({
         message: "Admin Dashboard",
         status: "ok"
     });
 };
 
-export const adminUsersController: Handler = (req, res) => {
+export const adminUsersController: Handler = (req: SprintRequest, res: SprintResponse) => {
     res.json({
         users: [
             { id: 1, name: "John Doe", role: "admin" },
             { id: 2, name: "Jane Smith", role: "user" }
         ]
     });
+};
+
+const { privateKey, encryptionSecret } = getJwtFromEnv();
+
+export const jwtGenerateController: Handler = (req: SprintRequest, res: SprintResponse) => {
+    const { userId, role } = req.body || {};
+    
+    try {
+        const payload = { userId, role: role || "user" };
+        const token = signEncrypted(payload, privateKey, encryptionSecret, { expiresIn: "1h" });
+        res.json({ token });
+    } catch (error) {
+        return res.status(500).json({ error: "JWT not configured" });
+    }
+};
+`;
+    } else {
+        return `import { Handler, SprintRequest, SprintResponse } from "sprint-es";
+import { signEncrypted, getJwtFromEnv } from "sprint-es/jwt";
+
+export const adminController = (req: SprintRequest, res: SprintResponse) => {
+    res.json({
+        message: "Admin Dashboard",
+        status: "ok"
+    });
+};
+
+export const adminUsersController = (req: SprintRequest, res: SprintResponse) => {
+    res.json({
+        users: [
+            { id: 1, name: "John Doe", role: "admin" },
+            { id: 2, name: "Jane Smith", role: "user" }
+        ]
+    });
+};
+
+const { privateKey, encryptionSecret } = getJwtFromEnv();
+
+export const jwtGenerateController = (req: SprintRequest, res: SprintResponse) => {
+    const { userId, role } = req.body || {};
+    
+    try {
+        const payload = { userId, role: role || "user" };
+        const token = signEncrypted(payload, privateKey, encryptionSecret, { expiresIn: "1h" });
+        res.json({ token });
+    } catch (error) {
+        return res.status(500).json({ error: "JWT not configured" });
+    }
 };
 `;
     }
-    return `import { Handler } from "sprint-es";
-
-export const adminController = (req, res) => {
-    res.json({
-        message: "Admin Dashboard",
-        status: "ok"
-    });
-};
-
-export const adminUsersController = (req, res) => {
-    res.json({
-        users: [
-            { id: 1, name: "John Doe", role: "admin" },
-            { id: 2, name: "Jane Smith", role: "user" }
-        ]
-    });
-};
-`;
 }
 
 export function getHomeSchema(language: string) {
@@ -270,6 +329,13 @@ export const adminSchema = defineRouteSchema({
         email: z.string().email().optional()
     })
 });
+
+export const jwtGenerateSchema = defineRouteSchema({
+    body: z.object({
+        userId: z.string().min(1),
+        role: z.string().optional()
+    })
+});
 `;
     }
     return `import { z, defineRouteSchema } from "sprint-es/schemas";
@@ -283,29 +349,31 @@ export const adminSchema = defineRouteSchema({
         email: z.string().email().optional()
     })
 });
+
+export const jwtGenerateSchema = defineRouteSchema({
+    body: z.object({
+        userId: z.string().min(1),
+        role: z.string().optional()
+    })
+});
 `;
 }
 
-export function getAuthMiddleware(language: string) {
+export function getInternalAuthMiddleware(language: string) {
     if (language === "typescript") {
-        return `import { defineMiddleware } from "sprint-es";
+        return `import { defineMiddleware, SprintRequest, SprintResponse, NextFunction } from "sprint-es";
 
 export default defineMiddleware({
-    name: "auth",
+    name: "adminAuth",
     priority: 10,
     include: "/admin/**",
-    handler: (req, res, next) => {
+    handler: (req: SprintRequest, res: SprintResponse, next: NextFunction) => {
         const auth = req.sprint.getAuthorization();
-
-        if (!auth) {
-            return res.status(401).json({ error: "No authorization header" });
-        }
+        if (!auth) return res.status(401).json({ error: "No authorization header" });
 
         const token = auth.replace("Bearer ", "");
 
-        if (token !== "admin-token") {
-            return res.status(403).json({ error: "Invalid token" });
-        }
+        if (token !== "admin-token") return res.status(403).json({ error: "Invalid token" });
 
         next();
     }
@@ -315,21 +383,73 @@ export default defineMiddleware({
     return `import { defineMiddleware } from "sprint-es";
 
 export default defineMiddleware({
-    name: "auth",
+    name: "adminAuth",
     priority: 10,
     include: "/admin/**",
     handler: (req, res, next) => {
         const auth = req.sprint.getAuthorization();
+        if (!auth)  return res.status(401).json({ error: "No authorization header" });
+        
+        const token = auth.replace("Bearer ", "");
 
-        if (!auth) {
-            return res.status(401).json({ error: "No authorization header" });
-        }
+        if (token !== "admin-token") return res.status(403).json({ error: "Invalid token" });
+        
+        next();
+    }
+});
+`;
+}
+
+export function getUserAuthMiddleware(language: string) {
+    if (language === "typescript") {
+        return `import { defineMiddleware, SprintRequest, SprintResponse, NextFunction } from "sprint-es";
+import { verifyEncrypted, getJwtFromEnv } from "sprint-es/jwt";
+
+const { publicKey, encryptionSecret } = getJwtFromEnv();
+
+export default defineMiddleware({
+    name: "userAuth",
+    priority: 10,
+    include: "/**",
+    exclude: "/admin/**",
+    handler: (req: SprintRequest, res: SprintResponse, next: NextFunction) => {
+        const auth = req.sprint.getAuthorization();
+        if (!auth) return res.status(401).json({ error: "No authorization header" });
 
         const token = auth.replace("Bearer ", "");
 
-        if (token !== "admin-token") {
-            return res.status(403).json({ error: "Invalid token" });
-        }
+        const decoded = verifyEncrypted(token, publicKey, encryptionSecret);
+
+        if (!decoded) return res.status(403).json({ error: "Invalid token" });
+        
+        req.custom.user = decoded;
+
+        next();
+    }
+});
+`;
+    }
+    return `import { defineMiddleware } from "sprint-es";
+import { verifyEncrypted, getJwtFromEnv } from "sprint-es/jwt";
+
+const { publicKey, encryptionSecret } = getJwtFromEnv();
+
+export default defineMiddleware({
+    name: "userAuth",
+    priority: 10,
+    include: "/**",
+    exclude: "/admin/**",
+    handler: (req, res, next) => {
+        const auth = req.sprint.getAuthorization();
+        if (!auth) return res.status(401).json({ error: "No authorization header" });
+
+        const token = auth.replace("Bearer ", "");
+
+        const decoded = verifyEncrypted(token, publicKey, encryptionSecret);
+
+        if (!decoded) return res.status(403).json({ error: "Invalid token" });
+
+        req.custom.user = decoded;
 
         next();
     }
@@ -373,8 +493,7 @@ CMD ["npm", "start"]
 }
 
 export function getDockerCompose(language: string) {
-    return `version: "3.8"
-
+    return `
 services:
   app:
     build: .
@@ -382,7 +501,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - PORT=3000
+      - PORT=5000
     restart: unless-stopped
 `;
 }
@@ -453,14 +572,16 @@ export function getSprintConfigFile(language: string, telemetry: string) {
         let config = `import type { SprintOptions } from "sprint-es";
 
 export const config: SprintOptions = {
-    port: process.env.PORT ? parseInt(process.env.PORT) : 3000
+    openapi: {
+        /* Generate OpenAPI spec on build - Coming Soon */
+        generateOnBuild: false
+    }
 };
 
 // Add Vite config here if needed
 // export const vite = {
     // build: { ... }
 // };
-
 `;
 
         if (telemetry === "sentry" || telemetry === "glitchtip") {
@@ -477,7 +598,7 @@ initTelemetry({
 
 initTelemetry({
     provider: "discord",
-    webhookUrl: process.env.DISCORD_WEBHOOK_URL || ""
+    webhookUrl: process.env.DISCORD_TELEMETRY_WEBHOOK_URL || ""
 });
 `;
         }
@@ -486,7 +607,10 @@ initTelemetry({
     }
 
     let config = `export const config = {
-    port: process.env.PORT ? parseInt(process.env.PORT) : 3000
+    openapi: {
+        /* Generate OpenAPI spec on build - Coming Soon */
+        generateOnBuild: false
+    }
 };
 `;
 
@@ -506,7 +630,7 @@ import { initTelemetry } from "sprint-es/telemetry";
 
 initTelemetry({
     provider: "discord",
-    webhookUrl: process.env.DISCORD_WEBHOOK_URL || ""
+    webhookUrl: process.env.DISCORD_TELEMETRY_WEBHOOK_URL || ""
 });
 `;
     }
@@ -515,7 +639,11 @@ initTelemetry({
 }
 
 export function getEnvExample(telemetry: string) {
-    let env = `PORT=3000
+    let env = `PORT=5000
+
+JWT_PUBLIC_KEY=""
+JWT_PRIVATE_KEY=""
+JWT_ENCRYPTION_SECRET=""
 
 # Development: npm run dev (NODE_ENV=development)
 # Production: npm start (NODE_ENV=production)
@@ -524,32 +652,40 @@ export function getEnvExample(telemetry: string) {
     if (telemetry === "sentry" || telemetry === "glitchtip") {
         env += `
 # Sentry / GlitchTip (use GlitchTip DSN for self-hosted)
-SENTRY_DSN=
+SENTRY_DSN=""
 `;
     } else if (telemetry === "discord") {
         env += `
 # Discord Webhook URL for error notifications
-DISCORD_WEBHOOK_URL=
+DISCORD_TELEMETRY_WEBHOOK_URL=""
 `;
     }
 
     return env;
 }
 
+function envKey(key: any): string {
+    return key;
+}
+
 export function getEnvDevelopment(telemetry: string) {
+    const keys = generateJWTKeys();
     let env = `NODE_ENV=development
-PORT=3000
+PORT=5000
+JWT_PUBLIC_KEY='${keys.publicKey}'
+JWT_PRIVATE_KEY='${keys.privateKey}'
+JWT_ENCRYPTION_SECRET='${crypto.randomBytes(32).toString("hex")}'
 `;
 
     if (telemetry === "sentry" || telemetry === "glitchtip") {
         env += `
 # Sentry / GlitchTip
-SENTRY_DSN=
+SENTRY_DSN=""
 `;
     } else if (telemetry === "discord") {
         env += `
 # Discord Webhook URL
-DISCORD_WEBHOOK_URL=
+DISCORD_TELEMETRY_WEBHOOK_URL=""
 `;
     }
 
@@ -557,8 +693,12 @@ DISCORD_WEBHOOK_URL=
 }
 
 export function getEnvProduction(telemetry: string) {
+    const keys = generateJWTKeys();
     let env = `NODE_ENV=production
-PORT=3000
+PORT=5000
+JWT_PUBLIC_KEY='${keys.publicKey}'
+JWT_PRIVATE_KEY='${keys.privateKey}'
+JWT_ENCRYPTION_SECRET='${crypto.randomBytes(32).toString("hex")}'
 `;
 
     if (telemetry === "sentry" || telemetry === "glitchtip") {
@@ -569,7 +709,7 @@ SENTRY_DSN=
     } else if (telemetry === "discord") {
         env += `
 # Discord Webhook URL
-DISCORD_WEBHOOK_URL=
+DISCORD_TELEMETRY_WEBHOOK_URL=
 `;
     }
 
