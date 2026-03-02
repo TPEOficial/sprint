@@ -1,6 +1,6 @@
 {
     "name": "create-sprint",
-    "version": "0.0.62",
+    "version": "0.0.64",
     "description": "Create a new Sprint API project",
     "type": "module",
     "bin": {
