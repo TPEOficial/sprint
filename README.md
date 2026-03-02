@@ -76,7 +76,11 @@ npm run dev
 ### Production
 
 ```bash
-npm run build && npm start
+npm run build && npm run start
+
+# or
+
+docker compose up -d
 ```
 
 ## Features
@@ -92,7 +96,12 @@ npm run build && npm start
 | CORS, Morgan, and similar modules preinstalled                         | 🟢 Active      |
 | Preconfigured health check and 404 error pages                         | 🟢 Active      |
 | Anti-directory listing rate limiting system                            | 🟢 Active      |
-| Logger module included to reduce memory consumption                    | 🟢 Active      |
+| Logger module included to reduce memory consumption                   | 🟢 Active      |
+| JWT authentication with EC signing                                      | 🟢 Active      |
+| Encrypted JWT (JWE-like with AES-256-GCM)                             | 🟢 Active      |
+| Token pairs (access + refresh tokens)                                 | 🟢 Active      |
+| CronJobs scheduler with node-cron                                      | 🟢 Active      |
+| Agnostic Telemetry (Sentry, GlitchTip, Discord)                       | 🟢 Active      |
 
 ```ts
 import Sprint from "sprint-es";
@@ -223,3 +232,123 @@ export default defineMiddleware({
 ```
 
 More info: https://docs.tpeoficial.com/docs/toolkitify/logger/introduction
+
+#### JWT Authentication
+
+Sprint includes a built-in JWT module using EC (elliptic curve) signing with ES256 algorithm.
+
+```ts
+import { sign, verify, generateKeyPair, createTokenPair, verifyTokenPair, getJwtFromEnv } from "sprint-es/jwt";
+
+// Generate key pair
+const { publicKey, privateKey } = generateKeyPair();
+
+// Sign a token
+const token = sign({ userId: 123 }, privateKey, { expiresIn: "15m" });
+
+// Verify a token
+const payload = verify(token, publicKey);
+
+// Create token pair (access + refresh)
+const { accessToken, refreshToken } = createTokenPair(
+    { userId: 123, role: "admin" },
+    privateKey,
+    { expiresIn: "15m" }
+);
+
+// Or load keys from environment
+const { publicKey, privateKey, encryptionSecret } = getJwtFromEnv();
+```
+
+More info: https://docs.tpeoficial.com/docs/sprint/jwt
+
+#### Encrypted JWT
+
+For sensitive data, use encrypted JWT (JWE-like) that combines EC signing with AES-256-GCM encryption.
+
+```ts
+import { signEncrypted, verifyEncrypted, getJwtFromEnv } from "sprint-es/jwt";
+
+const { publicKey, privateKey, encryptionSecret } = getJwtFromEnv();
+
+// Sign encrypted token
+const encryptedToken = signEncrypted(
+    { ssn: "123-45-6789", secret: "very-sensitive-data" },
+    privateKey,
+    encryptionSecret,
+    { expiresIn: "1h" }
+);
+
+// Verify and decrypt
+const payload = verifyEncrypted(encryptedToken, publicKey, encryptionSecret);
+```
+
+More info: https://docs.tpeoficial.com/docs/sprint/jwt
+
+#### CronJobs
+
+Schedule recurring tasks using cron expressions.
+
+```ts
+import { defineCronJob, stopAllCronJobs, getCronJobs } from "sprint-es/cronjobs";
+
+// Define a cronjob
+defineCronJob({
+    name: "cleanup",
+    cronExpression: "0 2 * * *", // Daily at 2 AM
+    timezone: "Europe/Madrid",
+    enabled: true,
+    handler: () => {
+        console.log("Running daily cleanup...");
+    }
+});
+
+// Get all registered cronjobs
+console.log(getCronJobs()); // ["cleanup"]
+
+// Stop all cronjobs (useful for testing)
+stopAllCronJobs();
+```
+
+More info: https://docs.tpeoficial.com/docs/sprint/cronjobs
+
+#### Agnostic Telemetry
+
+Sprint supports multiple telemetry providers: Sentry, GlitchTip, and Discord webhooks.
+
+```ts
+import { initTelemetry, captureError, captureMessage, setUser, providers } from "sprint-es/telemetry";
+
+// Initialize with Sentry
+initTelemetry({
+    provider: providers.SENTRY,
+    dsn: "https://xxx@sentry.io/xxx",
+    environment: "production"
+});
+
+// Initialize with GlitchTip (open-source Sentry alternative)
+initTelemetry({
+    provider: providers.GLITCHTIP,
+    dsn: "https://xxx@glitchtip.com/xxx"
+});
+
+// Initialize with Discord webhook
+initTelemetry({
+    provider: providers.DISCORD,
+    webhookUrl: "https://discord.com/api/webhooks/xxx"
+});
+
+// Capture errors and messages
+try {
+    throw new Error("Something went wrong");
+} catch (err) {
+    captureError(err, { extra: { context: "user-action" } });
+}
+
+captureMessage("User logged in", { level: "info" });
+
+// Set user context
+setUser({ id: "123", email: "user@example.com", username: "john" });
+```
+
+More info: https://docs.tpeoficial.com/docs/sprint/telemetry
