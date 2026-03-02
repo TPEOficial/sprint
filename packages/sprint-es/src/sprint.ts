@@ -30,21 +30,17 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
     let currentDir = startDir;
     while (currentDir !== path.parse(currentDir).root) {
         const packageJsonPath = path.join(currentDir, "package.json");
-        if (fs.existsSync(packageJsonPath)) {
-            return currentDir;
-        }
+        if (fs.existsSync(packageJsonPath)) return currentDir;
         currentDir = path.dirname(currentDir);
     }
     return null;
-}
+};
 
 async function loadSprintConfig(): Promise<SprintConfig | null> {
     const callerDir = process.argv[1] ? path.dirname(process.argv[1]) : process.cwd();
     const projectRoot = await findProjectRoot(callerDir);
     
-    if (!projectRoot) {
-        return null;
-    }
+    if (!projectRoot) return null;
 
     const configFiles = ["sprint.config.ts", "sprint.config.js"];
     
@@ -62,7 +58,7 @@ async function loadSprintConfig(): Promise<SprintConfig | null> {
     }
     
     return null;
-}
+};
 
 export class Sprint {
     public app: Application;
@@ -78,7 +74,9 @@ export class Sprint {
     private loadedMiddlewares: LoadedMiddleware[] = [];
     private openapi: {
         generateOnBuild: boolean;
-    } = { generateOnBuild: false };
+    } = { 
+        generateOnBuild: false
+    };
 
     constructor() {
         this.app = express();
@@ -111,9 +109,7 @@ export class Sprint {
                 generateOnBuild: finalConfig.openapi?.generateOnBuild ?? false
             };
 
-            if (this.openapi.generateOnBuild === true) {
-                console.log(`[Sprint] ⚠️ openapi.generateOnBuild is enabled but this option makes nothing for now`);
-            }
+            if (this.openapi.generateOnBuild === true) console.log(`[Sprint] ⚠️ openapi.generateOnBuild is enabled but this option makes nothing for now`);
 
             this.loadDefaults();
             this.loadHealthcheck();
@@ -395,9 +391,7 @@ export class Sprint {
     public delete(path: string, handler: Handler) { return this.app.delete(this.applyPrefix(path), handler); }
     public patch(path: string, handler: Handler) { return this.app.patch(this.applyPrefix(path), handler); }
     public use(pathOrHandler: string | Handler | MiddlewareConfig, maybeHandler?: Handler) {
-        if (typeof pathOrHandler === "string" && maybeHandler) {
-            return this.app.use(this.applyPrefix(pathOrHandler), maybeHandler);
-        }
+        if (typeof pathOrHandler === "string" && maybeHandler) return this.app.use(this.applyPrefix(pathOrHandler), maybeHandler);
         
         if (pathOrHandler && typeof pathOrHandler === "object" && "handler" in pathOrHandler) {
             const config = pathOrHandler as MiddlewareConfig;
