@@ -1,0 +1,39 @@
+{
+    "name": "create-sprint",
+    "version": "0.0.36",
+    "description": "Create a new Sprint API project",
+    "type": "module",
+    "bin": {
+        "create-sprint": "./dist/cli.js",
+        "sprint": "./dist/cli.js"
+    },
+    "files": [
+        "dist/**/*",
+        "src/**/*"
+    ],
+    "scripts": {
+        "build": "tsc && node -e \"const fs=require('fs');const p='dist/cli.js';let c=fs.readFileSync(p,'utf8');if(!c.startsWith('#!')){fs.writeFileSync(p,'#!/usr/bin/env node\\n'+c)}\"",
+        "prepublishOnly": "npm version patch && npm run build",
+        "start": "node dist/cli.js"
+    },
+    "keywords": [
+        "sprint",
+        "api",
+        "framework",
+        "init",
+        "create"
+    ],
+    "author": "TPEOficial LLC",
+    "license": "Apache-2.0",
+    "dependencies": {
+        "@inquirer/prompts": "^7.10.1"
+    },
+    "devDependencies": {
+        "@types/node": "^25.3.3",
+        "tsx": "^4.19.0",
+        "typescript": "^5.9.3"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}

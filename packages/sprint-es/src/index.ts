@@ -1,16 +1,16 @@
 import { Router as ExpressRouter } from "express";
 
 // Modules.
-export { Sprint } from "./sprint";
+export { Sprint, isDevelopment, isProduction } from "./sprint";
 export { defineMiddleware } from "./middleware";
 export { __filename, __dirname } from "./utils";
 
 // Types
-export type { Handler, MiddlewareConfig, SprintOptions, LoadedMiddleware } from "./types";
+export type { Handler, AsyncRequestHandler, MiddlewareConfig, SprintOptions, LoadedMiddleware, AuthorizationSource, SprintRequest } from "./types";
 
 // Router helper
 export const Router = () => ExpressRouter();
 
-// Default export
+// Default import
 import { Sprint } from "./sprint";
 export default Sprint;

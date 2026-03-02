@@ -1,16 +1,41 @@
 <div align="center">
-  <h1>Sprint for Node.JS</h1>
-  <h3>Sprint - Quickly API</h3>
+  <br />
+  <img src="./docs/images/banner.png" alt="Sprint Banner" />
+  <h1>Sprint — Edge Server</h1>
+  <p>A next-generation backend framework that enables instant API development with a single command, enforcing clean structure by default and eliminating repetitive code while keeping projects fast, organized, and scalable.</p>
   <img src="https://img.shields.io/badge/TypeScript-purple?style=for-the-badge&logo=typescript&logoColor=white"/> 
   <a href="https://github.com/TPEOficial"> <img alt="GitHub" src="https://img.shields.io/badge/GitHub-purple?style=for-the-badge&logo=github&logoColor=white"/></a>
   <a href="https://ko-fi.com/fjrg2007"> <img alt="Kofi" src="https://img.shields.io/badge/Ko--fi-purple?style=for-the-badge&logo=ko-fi&logoColor=white"></a>
   <br />
   <br />
-  <a href="#">Quickstart</a>
+  <a href="#quickstart">Quickstart</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="https://tpe.li/dsc">Discord</a>
   <hr />
 </div>
+
+## Quickstart
+
+```bash
+npx -y create-sprint
+```
+
+This will create a new Sprint project in the current directory with:
+- TypeScript configuration
+- Default routes and middlewares folders
+- Healthcheck endpoint
+
+### Development
+
+```bash
+npm run dev
+```
+
+### Production
+
+```bash
+npm run build && npm start
+```
 
 ## Features
 
@@ -33,8 +58,6 @@ import Sprint from "sprint-es";
 const app = new Sprint();
 
 app.get("/", (req, res) => res.send("Hello World!"));
-
-app.listen();
 ```
 
 #### File-based dynamic routing system 

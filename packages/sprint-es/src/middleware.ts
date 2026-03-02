@@ -1,5 +1,5 @@
 import { RequestHandler } from "express";
-import { MiddlewareConfig } from "./types";
+import { MiddlewareConfig, AsyncRequestHandler } from "./types";
 
 /**
  * Helper function to define a middleware with proper typing.
@@ -25,7 +25,7 @@ import { MiddlewareConfig } from "./types";
  * });
  */
 export function defineMiddleware(config: MiddlewareConfig): MiddlewareConfig {
-    const wrapHandler = (handler: RequestHandler): RequestHandler => {
+    const wrapHandler = (handler: RequestHandler | AsyncRequestHandler): RequestHandler => {
         return (req, res, next) => {
             const result = handler(req, res, next);
             if (result instanceof Promise) result.catch(next);

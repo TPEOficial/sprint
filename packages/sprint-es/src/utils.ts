@@ -28,11 +28,17 @@ export function matchPattern(pattern: string, routePath: string): boolean {
 
     if (normalizedPattern === normalizedRoute) return true;
 
-    const regexPattern = normalizedPattern
+    if (normalizedPattern.endsWith("/**")) {
+        const basePattern = normalizedPattern.slice(0, -3);
+        if (normalizedRoute === basePattern) return true;
+        return normalizedRoute.startsWith(basePattern + "/");
+    }
+
+    let regexPattern = normalizedPattern
         .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
         .replace(/\*\*/g, "{{DOUBLE}}")
         .replace(/\*/g, "[^/]+")
-        .replace(/{{DOUBLE}}/g, ".*");
+        .replace(/{{DOUBLE}}/g, "(.+/?)*");
 
     const regex = new RegExp(`^${regexPattern}$`);
     return regex.test(normalizedRoute);

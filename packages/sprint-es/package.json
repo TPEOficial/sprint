@@ -1,11 +1,12 @@
 {
   "name": "sprint-es",
-  "version": "0.0.23",
+  "version": "0.0.36",
   "description": "Sprint - Quickly API",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/types/index.d.ts",
   "type": "module",
+  "bin": "dist/esm/cli.js",
   "exports": {
     ".": {
       "types": "./dist/types/index.d.ts",
@@ -21,6 +22,26 @@
       "types": "./dist/types/modules/rate-limit/index.d.ts",
       "require": "./dist/cjs/modules/rate-limit/index.cjs",
       "import": "./dist/esm/modules/rate-limit/index.js"
+    },
+    "./telemetry": {
+      "types": "./dist/types/modules/telemetry/index.d.ts",
+      "require": "./dist/cjs/modules/telemetry/index.cjs",
+      "import": "./dist/esm/modules/telemetry/index.js"
+    },
+    "./schemas": {
+      "types": "./dist/types/modules/schemas/index.d.ts",
+      "require": "./dist/cjs/modules/schemas/index.cjs",
+      "import": "./dist/esm/modules/schemas/index.js"
+    },
+    "./cronjobs": {
+      "types": "./dist/types/modules/cronjobs/index.d.ts",
+      "require": "./dist/cjs/modules/cronjobs/index.cjs",
+      "import": "./dist/esm/modules/cronjobs/index.js"
+    },
+    "./jwt": {
+      "types": "./dist/types/modules/jwt/index.d.ts",
+      "require": "./dist/cjs/modules/jwt/index.cjs",
+      "import": "./dist/esm/modules/jwt/index.js"
     }
   },
   "files": [
@@ -30,8 +51,9 @@
   ],
   "scripts": {
     "clean": "rimraf dist",
-    "build": "vite build",
-    "start": "ts-node src/index.ts",
+    "build": "vite build && node -e \"const fs=require('fs');const p='dist/esm/cli.js';let c=fs.readFileSync(p,'utf8');if(!c.startsWith('#!')){fs.writeFileSync(p,'#!/usr/bin/env node\\n'+c)}\"",
+    "dev": "NODE_ENV=development ts-node src/index.ts",
+    "start": "NODE_ENV=production ts-node src/index.ts",
     "prepublishOnly": "npm run build",
     "test": "jest",
     "dev:example": "npm run build && node example/app.js"
@@ -56,9 +78,12 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "morgan": "^1.10.1",
+    "node-cron": "^3.0.3",
     "path": "^0.12.7",
     "serve-favicon": "^2.5.1",
-    "toolkitify": "^0.0.26"
+    "toolkitify": "^0.0.26",
+    "tsx": "^4.19.0",
+    "zod": "^3.25.0"
   },
   "contributors": [
     "TPEOficial (https://github.com/TPEOficial)",
@@ -70,6 +95,7 @@
     "@types/jest": "^30.0.0",
     "@types/morgan": "^1.9.10",
     "@types/node": "^22.18.7",
+    "@types/node-cron": "^3.0.11",
     "@types/serve-favicon": "^2.5.7",
     "dotenv": "^17.2.3",
     "jest": "^30.1.3",

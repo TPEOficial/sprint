@@ -1,19 +1,37 @@
 import { Request, Response, NextFunction, RequestHandler } from "express";
 
+export type AsyncRequestHandler = (req: Request, res: Response, next: NextFunction) => Promise<any>;
+
 export type Handler = (req: Request, res: Response, next: NextFunction) => any;
+
+export type AuthorizationSource = 
+    | `query:${string}` 
+    | `headers:${string}`;
+
+export interface SprintRequest {
+    getAuthorization: (sources?: AuthorizationSource | AuthorizationSource[]) => string | undefined;
+}
+
+declare global {
+    namespace Express {
+        interface Request {
+            sprint: SprintRequest;
+        }
+    }
+}
 
 /**
  * Configuration for a middleware defined in the middlewares folder.
  * Export this from your middleware file using `defineMiddleware()`.
  */
 export interface MiddlewareConfig {
-    /** The middleware function(s) to execute */
-    handler: RequestHandler | RequestHandler[];
+    /** The middleware function(s) to execute. Supports both sync and async handlers. */
+    handler: RequestHandler | AsyncRequestHandler | (RequestHandler | AsyncRequestHandler)[];
     /**
      * Routes to include. Supports patterns:
      * - Exact: "/api/users"
-     * - Single level: "/api/*" (matches /api/users but not /api/users/123)
-     * - All nested: "/api/**" (matches /api/users, /api/users/123, etc.)
+     * - Single level: "/api/*" (matches /apiapi/users/123)
+     * -/users but not / All nested: "/api/**" (matches /api/users, /api/users/123, etc.)
      * @default ["/**"] (all routes)
      */
     include?: string | string[];
@@ -43,6 +61,8 @@ export interface SprintOptions {
     routesPath?: string;
     /** Path to middlewares folder. Default: "./middlewares" */
     middlewaresPath?: string;
+    /** Path to cronjobs folder. Default: "./cronjobs" */
+    cronjobsPath?: string;
     /** Maximum request body size. Default: "50mb" */
     jsonLimit?: string;
     /** Maximum request body size. Default: "50mb" */
@@ -53,4 +73,6 @@ export interface SprintOptions {
      * @example "/api/v1" -> routes become /api/v1/users, /api/v1/posts
      */
     prefix?: string;
+    /** Auto-start the server. Default: true */
+    autoListen?: boolean;
 }

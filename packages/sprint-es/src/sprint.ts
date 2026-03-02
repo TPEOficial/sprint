@@ -8,19 +8,34 @@ import { pathToFileURL } from "url";
 import { RateLimiter } from "toolkitify/rate-limit";
 import { isVerbose, matchesPatterns, stripRouteGroups } from "./utils";
 import { Handler, SprintOptions, MiddlewareConfig, LoadedMiddleware } from "./types";
-import express, { Application, RequestHandler, Router as ExpressRouter } from "express";
+import express, { Application, RequestHandler, Router as ExpressRouter, Request } from "express";
+import { AuthorizationSource, SprintRequest } from "./types";
 
-dotenv.config();
+const nodeEnv = process.env.NODE_ENV?.toLowerCase();
+const isDev = nodeEnv === "development";
+const isProd = nodeEnv === "production";
+
+if (isDev) {
+    dotenv.config({ path: ".env.development" });
+} else if (isProd) {
+    dotenv.config({ path: ".env.production" });
+} else {
+    dotenv.config();
+}
 
 const limiter = new RateLimiter({
-    logs: process.argv.includes("--dev") || isVerbose
+    logs: isDev || isVerbose
 });
+
+export const isDevelopment = isDev;
+export const isProduction = isProd;
 
 export class Sprint {
     public app: Application;
     private port: string | number | null | undefined;
     private routesPath: string;
     private middlewaresPath: string;
+    private cronjobsPath: string;
     private jsonLimit: string;
     private urlEncodedLimit: string;
     private prefix: string;
@@ -32,14 +47,17 @@ export class Sprint {
         port = process.env.PORT,
         routesPath = "./routes",
         middlewaresPath = "./middlewares",
+        cronjobsPath = "./cronjobs",
         jsonLimit = "50mb",
         urlEncodedLimit = "50mb",
-        prefix = ""
+        prefix = "",
+        autoListen = true
     }: SprintOptions = {}) {
         this.app = express();
         this.port = port;
         this.routesPath = routesPath;
         this.middlewaresPath = middlewaresPath;
+        this.cronjobsPath = cronjobsPath;
         this.jsonLimit = jsonLimit;
         this.urlEncodedLimit = urlEncodedLimit;
         // Normalize prefix: ensure it starts with / and doesn't end with /.
@@ -48,6 +66,10 @@ export class Sprint {
         this.loadDefaults();
         this.loadHealthcheck();
         this.routesLoaded = this.init();
+
+        if (autoListen) {
+            this.routesLoaded.then(() => this.listen());
+        }
     };
 
     private async init(): Promise<void> {
@@ -62,7 +84,7 @@ export class Sprint {
             console.error("[Sprint] Failed to load middlewares:", err);
         }
 
-        // Then load routes.
+// Then load routes.
         try {
             const routesCandidate = path.isAbsolute(this.routesPath) ? this.routesPath : path.join(callerDir, this.routesPath);
             if (fs.existsSync(routesCandidate) && fs.statSync(routesCandidate).isDirectory()) await this.loadRoutes(routesCandidate);
@@ -70,14 +92,51 @@ export class Sprint {
         } catch (err) {
             console.error("[Sprint] Failed to load routes:", err);
         }
+
+        // Load cronjobs.
+        try {
+            const cronjobsCandidate = path.isAbsolute(this.cronjobsPath) ? this.cronjobsPath : path.join(callerDir, this.cronjobsPath);
+            if (fs.existsSync(cronjobsCandidate) && fs.statSync(cronjobsCandidate).isDirectory()) await this.loadCronJobs(cronjobsCandidate);
+            else if (isVerbose) console.log(`[Sprint] Cronjobs folder not found at: ${cronjobsCandidate}, skipping.`);
+        } catch (err) {
+            console.error("[Sprint] Failed to load cronjobs:", err);
+        }
     };
 
-    private loadDefaults(): void {
+private loadDefaults(): void {
+        this.app.disable("x-powered-by");
+
+        this.app.use((req: Request, res, next) => {
+            const getAuthorization = (sources?: AuthorizationSource | AuthorizationSource[]): string | undefined => {
+                const defaultSources: AuthorizationSource[] = ["query:token", "headers:authorization"];
+                const sourceList = sources ? (Array.isArray(sources) ? sources : [sources]) : defaultSources;
+                
+                for (const source of sourceList) {
+                    const [type, key] = source.split(":") as [string, string];
+                    
+                    if (type === "query") {
+                        const value = req.query[key];
+                        if (typeof value === "string" && value.length > 0) return value;
+                    } else if (type === "headers") {
+                        const value = req.headers[key.toLowerCase()];
+                        if (typeof value === "string" && value.length > 0) return value;
+                        if (Array.isArray(value) && value.length > 0 && typeof value[0] === "string" && value[0].length > 0) return value[0];
+                    }
+                }
+                
+                return undefined;
+            };
+
+            req.sprint = { getAuthorization };
+            next();
+        });
+
         this.app.use((_, res, next) => {
             res.setHeader("Content-Security-Policy", "default-src 'self'");
             res.setHeader("X-Content-Type-Options", "nosniff");
             res.setHeader("X-Frame-Options", "DENY");
             res.setHeader("X-XSS-Protection", "1; mode=block");
+            res.setHeader("X-Powered-By", "Sprint");
             return next();
         });
 
@@ -217,7 +276,26 @@ export class Sprint {
             }
         };
 
-        await walkDir(routesPath);
+await walkDir(routesPath);
+    };
+
+    private async loadCronJobs(cronjobsPath: string): Promise<void> {
+        const files = await fs.promises.readdir(cronjobsPath);
+
+        for (const file of files) {
+            const filePath = path.join(cronjobsPath, file);
+            const stat = await fs.promises.stat(filePath);
+
+            if (stat.isFile() && (file.endsWith(".ts") || file.endsWith(".js"))) {
+                try {
+                    const moduleUrl = pathToFileURL(filePath).href;
+                    await import(moduleUrl);
+                    console.log(`[Sprint] Loaded cronjob: ${file.replace(/\.(ts|js)$/, "")}`);
+                } catch (err) {
+                    console.warn(`[Sprint] Failed to load cronjob ${filePath}:`, err);
+                }
+            }
+        }
     };
 
     private loadNotFound(): void {
@@ -232,7 +310,7 @@ export class Sprint {
                         interval: "10s",
                         blockDuration: "1m",
                         storage: "memory"
-                    }).then((result: { success: boolean; remaining: number; limit: number; reset: number }) => {
+                    }).then((result: { success: boolean; remaining: number; limit: number; reset: number; }) => {
                         if (!result.success) {
                             console.log(`[RateLimiter] 404 limit reached for ${req.ip}. Retry at ${new Date(result.reset).toLocaleTimeString()}`);
                             res.status(429).send("Too many invalid requests. Try again later.");

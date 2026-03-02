@@ -1,7 +1,8 @@
 import Sprint from "../dist/esm/index.js";
 
 const app = new Sprint({
-    port: 3000
+    port: 3000,
+    autoListen: false
 });
 
 app.get("/", (req, res) => res.json({
