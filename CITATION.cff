@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+title: Sprint
+message: "⚡ Next-generation Edge Server framework for instant API development."
+type: software
+authors:
+  - given-names: FJRG2007
+    email: fjrg2007@tpeoficial.com
+repository-code: "https://github.com/TPEOficial/sprint"
+url: "https://tpeoficial.com"
+abstract: >-
+  Sprint is a next-generation backend framework designed to
+  enable instant API development with a single command. It
+  enforces clean structure by default, reduces boilerplate,
+  and keeps projects fast, organized, and scalable. Built
+  with TypeScript and focused on performance, security, and
+  developer experience.
+keywords:
+  - backend
+  - framework
+  - typescript
+  - api
+  - edge
+  - nodejs
+license: Apache-2.0
+version: Experimental
