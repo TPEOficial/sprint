@@ -1,5 +1,7 @@
 .env
+.env.*
 dist
 node_modules
 package-lock.json
 internal
+nul
