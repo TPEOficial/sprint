@@ -15,17 +15,14 @@ export const jwtValidateController: Handler = (req: SprintRequest, res: SprintRe
 };
 `;
     }
-    return `import { Handler, SprintRequest, SprintResponse } from "sprint-es";
-import { verifyEncrypted, getJwtFromEnv } from "sprint-es/jwt";
-
-export const homeController = (req: SprintRequest, res: SprintResponse) => {
+    return `export const homeController = (req, res) => {
     res.json({
         message: "Hello World",
         status: "ok"
     });
 };
 
-export const jwtValidateController = (req: SprintRequest, res: SprintResponse) => {
+export const jwtValidateController = (req, res) => {
     return res.json(req.custom.user);
 };
 `;
@@ -67,17 +64,19 @@ export const jwtGenerateController: Handler = (req: SprintRequest, res: SprintRe
 };
 `;
     } else {
-        return `import { Handler, SprintRequest, SprintResponse } from "sprint-es";
-import { signEncrypted, getJwtFromEnv } from "sprint-es/jwt";
+        return `import { signEncrypted } from "sprint-es/jwt";
 
-export const adminController = (req: SprintRequest, res: SprintResponse) => {
+const privateKey = process.env.JWT_PRIVATE_KEY;
+const encryptionSecret = process.env.JWT_ENCRYPTION_SECRET;
+
+export const adminController = (req, res) => {
     res.json({
         message: "Admin Dashboard",
         status: "ok"
     });
 };
 
-export const adminUsersController = (req: SprintRequest, res: SprintResponse) => {
+export const adminUsersController = (req, res) => {
     res.json({
         users: [
             { id: 1, name: "John Doe", role: "admin" },
@@ -86,9 +85,7 @@ export const adminUsersController = (req: SprintRequest, res: SprintResponse) =>
     });
 };
 
-const { privateKey, encryptionSecret } = getJwtFromEnv();
-
-export const jwtGenerateController = (req: SprintRequest, res: SprintResponse) => {
+export const jwtGenerateController = (req, res) => {
     const { userId, role } = req.body || {};
     
     try {

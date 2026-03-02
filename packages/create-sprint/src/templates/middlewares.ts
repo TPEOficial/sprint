@@ -69,9 +69,10 @@ export default defineMiddleware({
 `;
     }
     return `import { defineMiddleware } from "sprint-es";
-import { verifyEncrypted, getJwtFromEnv } from "sprint-es/jwt";
+import { verifyEncrypted } from "sprint-es/jwt";
 
-const { publicKey, encryptionSecret } = getJwtFromEnv();
+const publicKey = process.env.JWT_PUBLIC_KEY;
+const encryptionSecret = process.env.JWT_ENCRYPTION_SECRET;
 
 export default defineMiddleware({
     name: "userAuth",
