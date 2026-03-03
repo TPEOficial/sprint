@@ -54,20 +54,24 @@ jobs:
           docker compose up -d --build
               
       - name: Wait & Test Health
+        working-directory: /tmp/docker-test
         run: |
-          echo "Waiting for container..."
-          sleep 10
+          echo "Waiting for health..."
               
-          echo "---- SERVICES ----"
-          docker compose ps
+          for i in {1..30}; do
+            if curl -s http://localhost:5000/health; then
+              echo "Health OK"
+              exit 0
+            fi
+            sleep 1
+          done
               
-          echo "---- LOGS ----"
-          docker compose logs || true
-              
-          echo "---- CURL TEST ----"
-          curl -v http://localhost:5000/health
+          echo "Health failed"
+          docker compose logs
+          exit 1
               
       - name: Stop containers
+        working-directory: /tmp/docker-test
         if: always()
         run: |
           cd /tmp/docker-test
@@ -81,15 +85,28 @@ jobs:
           cd docker-test-graphql
           npm install
           
-      - name: Build Docker image with GraphQL
+      - name: Build & Start GraphQL with Docker Compose
+        working-directory: /tmp/docker-test-graphql
+        run: docker compose up -d --build
+              
+      - name: Wait & Test GraphQL Health
+        working-directory: /tmp/docker-test-graphql
         run: |
-          cd /tmp/docker-test-graphql
-          docker build -t sprint-test-graphql .
-          
-      - name: Run Docker container with GraphQL
-        run: |
-          docker run -d -p 5001:5000 --name sprint-test-graphql sprint-test-graphql
-          sleep 10
-          curl -s http://localhost:5001/health || exit 1
-          docker stop sprint-test-graphql || true
-          docker rm sprint-test-graphql || true
+          echo "Waiting for GraphQL container..."
+              
+          for i in {1..30}; do
+            if curl -s http://localhost:5001/health; then
+              echo "Health OK"
+              exit 0
+            fi
+            sleep 1
+          done
+              
+          echo "Health failed"
+          docker compose logs
+          exit 1
+              
+      - name: Stop GraphQL containers
+        if: always()
+        working-directory: /tmp/docker-test-graphql
+        run: docker compose down
