@@ -49,18 +49,30 @@ jobs:
           cd docker-test
           npm install
           
-      - name: Build Docker image
+      - name: Build & Start with Docker Compose
         run: |
           cd /tmp/docker-test
-          docker build -t sprint-test .
-          
-      - name: Run Docker container
+          docker compose up -d --build
+              
+      - name: Wait & Test Health
         run: |
-          docker run -d -p 5000:5000 --name sprint-test sprint-test
+          echo "Waiting for container..."
           sleep 10
-          curl -s http://localhost:5000/health || exit 1
-          docker stop sprint-test || true
-          docker rm sprint-test || true
+              
+          echo "---- SERVICES ----"
+          docker compose ps
+              
+          echo "---- LOGS ----"
+          docker compose logs || true
+              
+          echo "---- CURL TEST ----"
+          curl -v http://localhost:5000/health
+              
+      - name: Stop containers
+        if: always()
+        run: |
+          cd /tmp/docker-test
+          docker compose down
           
       - name: Create test project with GraphQL
         run: |
