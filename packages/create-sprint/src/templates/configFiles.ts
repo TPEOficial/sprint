@@ -33,21 +33,21 @@ import { resolve } from "path";
 export default defineConfig({
     build: {
         lib: {
-            entry: resolve(__dirname, "src/index.ts"),
+            entry: "src/app.ts",
             formats: ["es"],
-            fileName: "index",
+            fileName: "app"
         },
         outDir: "dist",
         rollupOptions: {
-            external: ["sprint-es", "express", "cors", "morgan", "serve-favicon", "dotenv"],
+            external: ["sprint-es", "express", "cors", "morgan", "serve-favicon", "dotenv"]
         },
-        target: "ES2020",
+        target: "ES2020"
     },
     resolve: {
         alias: {
-            "@": resolve(__dirname, "src"),
-        },
-    },
+            "@": "src"
+        }
+    }
 });
 `;
 };
