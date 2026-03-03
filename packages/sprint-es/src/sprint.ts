@@ -172,7 +172,7 @@ export class Sprint {
                 path: finalConfig.graphql?.path || "/graphql",
                 graphiql: {
                     enabled: isEnabledInEnv(finalConfig.graphql?.graphiql?.enabled),
-                    path: finalConfig.graphql?.graphiql?.path || "/grapiql"
+                    path: finalConfig.graphql?.graphiql?.path || "/graphiql"
                 }
             };
 
