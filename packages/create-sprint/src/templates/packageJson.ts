@@ -22,7 +22,9 @@ export function getTypeScriptPackageJson(name: string, telemetry: string, swagge
     const devDeps: Record<string, string> = {
         "@types/node": "^22.0.0",
         "tsx": "^4.19.0",
-        typescript: "^5.6.0"
+        typescript: "^5.6.0",
+        vite: "^6.4.1",
+        "vite-plugin-dts": "^4.5.4"
     };
 
     if (telemetry === "sentry" || telemetry === "glitchtip") deps["@sentry/node"] = "^8.0.0";

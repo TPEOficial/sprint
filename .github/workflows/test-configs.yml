@@ -34,7 +34,7 @@ jobs:
         run: |
           cd /tmp
           rm -rf test-ts-swagger
-          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js --name test-ts-swagger --ts --swagger --yes
+          node ${{ github.workspace }}/packages/create-sprint/dist/cli.js --name test-ts-swagger --ts --swagger --yes
           cd test-ts-swagger
           npm install
           npm run build
@@ -47,7 +47,7 @@ jobs:
         run: |
           cd /tmp
           rm -rf test-ts-graphql
-          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js --name test-ts-graphql --ts --graphql --yes
+          node ${{ github.workspace }}/packages/create-sprint/dist/cli.js --name test-ts-graphql --ts --graphql --yes
           cd test-ts-graphql
           npm install
           npm run build
@@ -60,7 +60,7 @@ jobs:
         run: |
           cd /tmp
           rm -rf test-ts-both
-          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js --name test-ts-both --ts --swagger --graphql --yes
+          node ${{ github.workspace }}/packages/create-sprint/dist/cli.js --name test-ts-both --ts --swagger --graphql --yes
           cd test-ts-both
           npm install
           npm run build
@@ -90,7 +90,7 @@ jobs:
         run: |
           cd /tmp
           rm -rf test-js-swagger
-          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js --name test-js-swagger --js --swagger --yes
+          node ${{ github.workspace }}/packages/create-sprint/dist/cli.js --name test-js-swagger --js --swagger --yes
           cd test-js-swagger
           npm install
           npm run dev &
@@ -102,7 +102,7 @@ jobs:
         run: |
           cd /tmp
           rm -rf test-js-graphql
-          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js test-js-graphql --js --graphql --yes
+          node ${{ github.workspace }}/packages/create-sprint/dist/cli.js --name test-js-graphql --js --graphql --yes
           cd test-js-graphql
           npm install
           npm run dev &
