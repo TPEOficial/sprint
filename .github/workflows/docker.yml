@@ -45,7 +45,8 @@ jobs:
         run: |
           cd ${{ github.workspace }}
           rm -rf /tmp/docker-test
-          node packages/create-sprint/dist/cli.js /tmp/docker-test --ts --swagger --docker --yes
+          cd /tmp
+          node packages/create-sprint/dist/cli.js --name docker-test --ts --swagger --docker --yes
           cd /tmp/docker-test
           npm install
           
@@ -65,7 +66,8 @@ jobs:
       - name: Create test project with GraphQL
         run: |
           rm -rf /tmp/docker-test-graphql
-          node ${{ github.workspace }}/packages/create-sprint/dist/cli.js /tmp/docker-test-graphql --ts --graphql --docker --yes
+          cd /tmp
+          node ${{ github.workspace }}/packages/create-sprint/dist/cli.js --name docker-test-graphql --ts --graphql --docker --yes
           cd /tmp/docker-test-graphql
           npm install
           
