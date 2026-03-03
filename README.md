@@ -75,6 +75,12 @@ This will create a new Sprint project in the current directory with:
 npm run dev
 ```
 
+If you want to check that your project is designed correctly, you can run the following command to receive a report in case you have anti-patterns:
+
+```bash
+npm run doctor
+```
+
 ### Production
 
 ```bash
@@ -98,6 +104,7 @@ docker compose up -d
 | CORS, Morgan, and similar modules preinstalled                         | 🟢 Active      |
 | Validation scheme and documentation generation system                  | 🟢 Active      |
 | Automatic generation of OpenAPI + Swagger UI                  | 🟢 Active      |
+| Sprint Doctor for detecting anti-patterns                  | 🟢 Active      |
 | Preconfigured health check and 404 error pages                         | 🟢 Active      |
 | Anti-directory listing rate limiting system                            | 🟢 Active      |
 | Logger module included to reduce memory consumption                   | 🟢 Active      |

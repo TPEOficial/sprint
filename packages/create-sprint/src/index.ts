@@ -99,16 +99,13 @@ export async function runCLI(args: string[]) {
         config.language,
         config.telemetry,
         config.swagger,
-        config.docker,
+        config.docker
     );
     s.stop("Project created");
 
     let installDeps = true;
-    if (options.skipInstall) {
-        installDeps = false;
-    } else if (!options.skipPrompts) {
-        installDeps = await p.confirm({ message: "Install dependencies now?", initialValue: true }) as boolean;
-    }
+    if (options.skipInstall) installDeps = false;
+    else if (!options.skipPrompts) installDeps = await p.confirm({ message: "Install dependencies now?", initialValue: true }) as boolean;
 
     if (installDeps) {
         const s2 = p.spinner();
@@ -140,10 +137,8 @@ export async function runCLI(args: string[]) {
     p.note(
         [
             !installDeps ? `${cdCmd}npm install` : "",
-            `${cdCmd}npm run dev`,
-        ]
-            .filter(Boolean)
-            .join("\n"),
+            `${cdCmd}npm run dev`
+        ].filter(Boolean).join("\n"),
         "Next steps"
     );
 

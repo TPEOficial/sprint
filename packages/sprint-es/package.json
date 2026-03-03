@@ -1,122 +1,122 @@
 {
-  "name": "sprint-es",
-  "version": "0.0.73",
-  "description": "Sprint - Quickly API",
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
-  "types": "dist/types/index.d.ts",
-  "type": "module",
-  "bin": "dist/esm/cli.js",
-  "exports": {
-    ".": {
-      "types": "./dist/types/index.d.ts",
-      "require": "./dist/cjs/index.cjs",
-      "import": "./dist/esm/index.js"
+    "name": "sprint-es",
+    "version": "0.0.81",
+    "description": "Sprint - Quickly API",
+    "main": "dist/cjs/index.js",
+    "module": "dist/esm/index.js",
+    "types": "dist/types/index.d.ts",
+    "type": "module",
+    "bin": "dist/esm/cli.js",
+    "exports": {
+        ".": {
+            "types": "./dist/types/index.d.ts",
+            "require": "./dist/cjs/index.cjs",
+            "import": "./dist/esm/index.js"
+        },
+        "./logger": {
+            "types": "./dist/types/modules/logger/index.d.ts",
+            "require": "./dist/cjs/modules/logger/index.cjs",
+            "import": "./dist/esm/modules/logger/index.js"
+        },
+        "./rate-limit": {
+            "types": "./dist/types/modules/rate-limit/index.d.ts",
+            "require": "./dist/cjs/modules/rate-limit/index.cjs",
+            "import": "./dist/esm/modules/rate-limit/index.js"
+        },
+        "./telemetry": {
+            "types": "./dist/types/modules/telemetry/index.d.ts",
+            "require": "./dist/cjs/modules/telemetry/index.cjs",
+            "import": "./dist/esm/modules/telemetry/index.js"
+        },
+        "./schemas": {
+            "types": "./dist/types/modules/schemas/index.d.ts",
+            "require": "./dist/cjs/modules/schemas/index.cjs",
+            "import": "./dist/esm/modules/schemas/index.js"
+        },
+        "./cronjobs": {
+            "types": "./dist/types/modules/cronjobs/index.d.ts",
+            "require": "./dist/cjs/modules/cronjobs/index.cjs",
+            "import": "./dist/esm/modules/cronjobs/index.js"
+        },
+        "./jwt": {
+            "types": "./dist/types/modules/jwt/index.d.ts",
+            "require": "./dist/cjs/modules/jwt/index.cjs",
+            "import": "./dist/esm/modules/jwt/index.js"
+        },
+        "./utils": {
+            "types": "./dist/types/modules/utils/index.d.ts",
+            "require": "./dist/cjs/modules/utils/index.cjs",
+            "import": "./dist/esm/modules/utils/index.js"
+        }
     },
-    "./logger": {
-      "types": "./dist/types/modules/logger/index.d.ts",
-      "require": "./dist/cjs/modules/logger/index.cjs",
-      "import": "./dist/esm/modules/logger/index.js"
+    "files": [
+        "dist/**/*",
+        "README.md",
+        "LICENSE"
+    ],
+    "scripts": {
+        "clean": "rimraf dist",
+        "build": "vite build && node -e \"const fs=require('fs');const p='dist/esm/cli.js';let c=fs.readFileSync(p,'utf8');if(!c.startsWith('#!')){fs.writeFileSync(p,'#!/usr/bin/env node\\n'+c)}\"",
+        "dev": "NODE_ENV=development ts-node src/index.ts",
+        "start": "NODE_ENV=production ts-node src/index.ts",
+        "prepublishOnly": "npm run build",
+        "test": "jest",
+        "dev:example": "npm run build && node example/app.js"
     },
-    "./rate-limit": {
-      "types": "./dist/types/modules/rate-limit/index.d.ts",
-      "require": "./dist/cjs/modules/rate-limit/index.cjs",
-      "import": "./dist/esm/modules/rate-limit/index.js"
+    "repository": {
+        "url": "https://github.com/TPEOficial/sprint"
     },
-    "./telemetry": {
-      "types": "./dist/types/modules/telemetry/index.d.ts",
-      "require": "./dist/cjs/modules/telemetry/index.cjs",
-      "import": "./dist/esm/modules/telemetry/index.js"
+    "keywords": [
+        "express",
+        "api",
+        "sprint",
+        "rate-limit"
+    ],
+    "author": "TPEOficial LLC",
+    "license": "Apache-2.0",
+    "bugs": {
+        "url": "https://github.com/TPEOficial/sprint/issues"
     },
-    "./schemas": {
-      "types": "./dist/types/modules/schemas/index.d.ts",
-      "require": "./dist/cjs/modules/schemas/index.cjs",
-      "import": "./dist/esm/modules/schemas/index.js"
+    "homepage": "https://dymo.tpeoficial.com",
+    "dependencies": {
+        "axios": "^1.13.2",
+        "cors": "^2.8.5",
+        "dotenv": "^17.3.1",
+        "express": "^5.1.0",
+        "morgan": "^1.10.1",
+        "node-cron": "^3.0.3",
+        "path": "^0.12.7",
+        "serve-favicon": "^2.5.1",
+        "toolkitify": "^0.0.26",
+        "tsx": "^4.19.0",
+        "zod": "^3.25.0"
     },
-    "./cronjobs": {
-      "types": "./dist/types/modules/cronjobs/index.d.ts",
-      "require": "./dist/cjs/modules/cronjobs/index.cjs",
-      "import": "./dist/esm/modules/cronjobs/index.js"
+    "contributors": [
+        "TPEOficial (https://github.com/TPEOficial)",
+        "FJRG2007 (https://github.com/FJRG2007)"
+    ],
+    "devDependencies": {
+        "@types/cors": "^2.8.19",
+        "@types/express": "^5.0.5",
+        "@types/jest": "^30.0.0",
+        "@types/morgan": "^1.9.10",
+        "@types/node": "^22.18.7",
+        "@types/node-cron": "^3.0.11",
+        "@types/serve-favicon": "^2.5.7",
+        "@types/swagger-ui-express": "^4.1.8",
+        "jest": "^30.1.3",
+        "rimraf": "^6.0.1",
+        "ts-jest": "^29.4.4",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.5.4",
+        "vite": "^6.4.1",
+        "vite-plugin-dts": "^4.5.4"
     },
-    "./jwt": {
-      "types": "./dist/types/modules/jwt/index.d.ts",
-      "require": "./dist/cjs/modules/jwt/index.cjs",
-      "import": "./dist/esm/modules/jwt/index.js"
+    "optionalDependencies": {
+        "swagger-ui-express": "^5.0.1"
     },
-    "./utils": {
-      "types": "./dist/types/modules/utils/index.d.ts",
-      "require": "./dist/cjs/modules/utils/index.cjs",
-      "import": "./dist/esm/modules/utils/index.js"
+    "prettier": {
+        "tabWidth": 4,
+        "useTabs": false
     }
-  },
-  "files": [
-    "dist/**/*",
-    "README.md",
-    "LICENSE"
-  ],
-  "scripts": {
-    "clean": "rimraf dist",
-    "build": "vite build && node -e \"const fs=require('fs');const p='dist/esm/cli.js';let c=fs.readFileSync(p,'utf8');if(!c.startsWith('#!')){fs.writeFileSync(p,'#!/usr/bin/env node\\n'+c)}\"",
-    "dev": "NODE_ENV=development ts-node src/index.ts",
-    "start": "NODE_ENV=production ts-node src/index.ts",
-    "prepublishOnly": "npm run build",
-    "test": "jest",
-    "dev:example": "npm run build && node example/app.js"
-  },
-  "repository": {
-    "url": "https://github.com/TPEOficial/sprint"
-  },
-  "keywords": [
-    "express",
-    "api",
-    "sprint",
-    "rate-limit"
-  ],
-  "author": "TPEOficial LLC",
-  "license": "Apache-2.0",
-  "bugs": {
-    "url": "https://github.com/TPEOficial/sprint/issues"
-  },
-  "homepage": "https://dymo.tpeoficial.com",
-  "dependencies": {
-    "axios": "^1.13.2",
-    "cors": "^2.8.5",
-    "dotenv": "^17.3.1",
-    "express": "^5.1.0",
-    "morgan": "^1.10.1",
-    "node-cron": "^3.0.3",
-    "path": "^0.12.7",
-    "serve-favicon": "^2.5.1",
-    "toolkitify": "^0.0.26",
-    "tsx": "^4.19.0",
-    "zod": "^3.25.0"
-  },
-  "contributors": [
-    "TPEOficial (https://github.com/TPEOficial)",
-    "FJRG2007 (https://github.com/FJRG2007)"
-  ],
-  "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.5",
-    "@types/jest": "^30.0.0",
-    "@types/morgan": "^1.9.10",
-    "@types/node": "^22.18.7",
-    "@types/node-cron": "^3.0.11",
-    "@types/serve-favicon": "^2.5.7",
-    "@types/swagger-ui-express": "^4.1.8",
-    "jest": "^30.1.3",
-    "rimraf": "^6.0.1",
-    "ts-jest": "^29.4.4",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.5.4",
-    "vite": "^6.4.1",
-    "vite-plugin-dts": "^4.5.4"
-  },
-  "optionalDependencies": {
-    "swagger-ui-express": "^5.0.1"
-  },
-  "prettier": {
-    "tabWidth": 4,
-    "useTabs": false
-  }
 }

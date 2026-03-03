@@ -1,13 +1,19 @@
 export function getInternalAuthMiddleware(language: string) {
     if (language === "typescript") {
-        return `import { defineMiddleware, SprintRequest, SprintResponse, NextFunction } from "sprint-es";
+        return `import { z } from "sprint-es/schemas";
+import { defineMiddleware, SprintRequest, SprintResponse, NextFunction } from "sprint-es";
 
 export default defineMiddleware({
     name: "adminAuth",
     priority: 10,
     include: "/admin/**",
+    schema: {
+        sprint: {
+           authorization: z.sprint().authorization()
+        }
+    },
     handler: (req: SprintRequest, res: SprintResponse, next: NextFunction) => {
-        const auth = req.sprint.getAuthorization();
+        const auth = req.sprint.authorization;
         if (!auth) return res.status(401).json({ error: "No authorization header" });
 
         const token = auth.replace("Bearer ", "");
@@ -19,14 +25,20 @@ export default defineMiddleware({
 });
 `;
     }
-    return `import { defineMiddleware } from "sprint-es";
+    return `import { z } from "sprint-es/schemas";
+import { defineMiddleware } from "sprint-es";
 
 export default defineMiddleware({
     name: "adminAuth",
     priority: 10,
     include: "/admin/**",
+    schema: {
+        sprint: {
+           authorization: z.sprint().authorization()
+        }
+    },
     handler: (req, res, next) => {
-        const auth = req.sprint.getAuthorization();
+        const auth = req.sprint.authorization;
         if (!auth)  return res.status(401).json({ error: "No authorization header" });
         
         const token = auth.replace("Bearer ", "");

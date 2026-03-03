@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction, RequestHandler } from "express";
+import { ZodSchema } from "./modules/schemas/types";
 
 export type AsyncRequestHandler = (req: Request, res: Response, next: NextFunction) => Promise<any>;
 
@@ -10,6 +11,7 @@ export type AuthorizationSource =
 
 export interface SprintRequest {
     getAuthorization: (sources?: AuthorizationSource | AuthorizationSource[]) => string | undefined;
+    authorization?: string;
 }
 
 export type SprintResponse = Response;
@@ -22,6 +24,16 @@ declare global {
             custom: any;
         }
     }
+}
+
+export interface MiddlewareSchema {
+    body?: ZodSchema;
+    queryParams?: ZodSchema;
+    params?: ZodSchema;
+    headers?: ZodSchema;
+    sprint?: {
+        authorization?: ZodSchema;
+    };
 }
 
 /**
@@ -53,6 +65,11 @@ export interface MiddlewareConfig {
     priority?: number;
     /** Optional name for logging purposes */
     name?: string;
+    /**
+     * Schema for request validation and OpenAPI generation.
+     * Supports body, queryParams, params, headers, and sprint.authorization.
+     */
+    schema?: MiddlewareSchema;
 }
 
 export interface LoadedMiddleware extends MiddlewareConfig {

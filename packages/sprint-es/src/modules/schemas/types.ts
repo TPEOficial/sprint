@@ -6,4 +6,8 @@ export interface ZodMiddlewareOptions {
     body?: ZodSchema;
     queryParams?: ZodSchema;
     params?: ZodSchema;
+    headers?: ZodSchema;
+    sprint?: {
+        authorization?: ZodSchema;
+    };
 }

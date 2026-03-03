@@ -1,5 +1,7 @@
 export type Provider = "sentry" | "glitchtip" | "discord" | "none";
 
+export type TelemetryProvider = Provider;
+
 export interface TelemetryConfig {
     provider: Provider;
     dsn?: string;

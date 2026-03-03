@@ -13,7 +13,6 @@ export function validateProjectName(name: string): string | null {
     
     if (n !== encodeURIComponent(n)) return "Project name must be URL-safe";
     
-
     const reserved = ["node_modules", "favicon.ico"];
     if (reserved.includes(n.toLowerCase())) return `Cannot use "${n}" as project name`;
     

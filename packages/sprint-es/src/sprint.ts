@@ -130,8 +130,6 @@ export class Sprint {
                 }
             };
 
-            if (this.openapi.generateOnBuild === true) console.log(`[Sprint] ⚠️ openapi.generateOnBuild is enabled but this option makes nothing for now`);
-
             this.loadDefaults();
             this.loadHealthcheck();
             this.routesLoaded = this.init();
@@ -146,6 +144,14 @@ export class Sprint {
                         try {
                             const swaggerUi = await import("swagger-ui-express");
                             const ui = swaggerUi.default;
+                            this.app.use("/swagger", (req, res, next) => {
+                                res.setHeader(
+                                    "Content-Security-Policy",
+                                    "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https:"
+                                );
+                                next();
+                            });
+
                             this.app.use("/swagger", ui.serve, ui.setup(undefined, {
                                 swaggerUrl: "/openapi.json"
                             }));
@@ -360,21 +366,20 @@ export class Sprint {
                                         const handlers = Array.isArray(routeLayer.handle) ? routeLayer.handle : [routeLayer.handle];
                                         
                                         // Find the schema in the handlers (it's usually the first one)
+                                        let schema: any;
                                         for (const handler of handlers) {
-                                            const schema = (handler as any).__sprintRouteSchema;
+                                            schema = (handler as any).__sprintRouteSchema;
+                                            if (schema) break;
+                                        }
 
-                                            if (schema) {
-                                                const method = (routeLayer.method || "").toUpperCase();
+                                        const method = (routeLayer.method || "").toUpperCase();
 
-                                                if (method) {
-                                                    (this as any).registeredRoutes.push({
-                                                        method,
-                                                        path: finalRoute + route.path,
-                                                        schema
-                                                    });
-                                                }
-                                                break;
-                                            }
+                                        if (method) {
+                                            (this as any).registeredRoutes.push({
+                                                method,
+                                                path: finalRoute + route.path,
+                                                schema
+                                            });
                                         }
                                     }
                                 }
@@ -475,7 +480,9 @@ export class Sprint {
                 }
             };
 
-            // Add request body schema if defined (only for non-GET/HEAD/DELETE methods)
+            let allParams: any[] = [];
+
+            // Add request body schema if defined (only for non-GET/HEAD/DELETE methods).
             if (route.schema?.body && !["GET", "HEAD", "DELETE"].includes(route.method)) {
                 try {
                     const bodySchema = this.zodSchemaToOpenAPI(route.schema.body);
@@ -497,10 +504,125 @@ export class Sprint {
             if (route.schema?.queryParams) {
                 try {
                     const params = this.zodParamsToOpenAPI(route.schema.queryParams);
-                    if (params.length > 0) routeSpec.parameters = params;
+                    if (params.length > 0) allParams.push(...params);
                 } catch (e) {
                     console.warn("[Sprint] Failed to convert query params schema:", e);
                 }
+            }
+
+            // Add headers schema if defined
+            if (route.schema?.headers) {
+                try {
+                    const headers = this.zodHeadersToOpenAPI(route.schema.headers);
+                    if (headers.length > 0) allParams.push(...headers);
+                } catch (e) {
+                    console.warn("[Sprint] Failed to convert headers schema:", e);
+                }
+            }
+
+            // Add route sprint.authorization if defined
+            if (route.schema?.sprint?.authorization) {
+                const authSchema = route.schema.sprint.authorization;
+                const description = authSchema._def?.description;
+                let sources: string[] = ["query:token", "headers:authorization"];
+                
+                if (description) {
+                    try {
+                        const parsed = JSON.parse(description);
+                        if (parsed.__sprintAuthorization && parsed.sources) sources = Array.isArray(parsed.sources) ? parsed.sources : [parsed.sources];
+                    } catch {}
+                }
+                
+                const isRequired = sources.length === 1;
+                
+                for (const source of sources) {
+                    const [type, key] = source.split(":");
+                    if (type === "query") {
+                        allParams.push({
+                            name: key,
+                            in: "query",
+                            required: isRequired,
+                            schema: { type: "string" }
+                        });
+                    } else if (type === "headers") {
+                        allParams.push({
+                            name: key,
+                            in: "header",
+                            required: isRequired,
+                            schema: { type: "string" }
+                        });
+                    }
+                }
+            }
+
+            // Add middleware schemas for this route
+            if (this.openapi.generateOnBuild) {
+                try {
+                    const routeMiddlewares = this.getMiddlewaresForRoute(route.path);
+                    
+                    for (const mw of this.loadedMiddlewares) {
+                        const includePatterns = Array.isArray(mw.include) ? mw.include : [mw.include || "/**"];
+                        const excludePatterns = Array.isArray(mw.exclude) ? mw.exclude : (mw.exclude ? [mw.exclude] : []);
+                        
+                        const isIncluded = matchesPatterns(includePatterns, route.path);
+                        const isExcluded = excludePatterns.length > 0 && matchesPatterns(excludePatterns, route.path);
+                        
+                        if (isIncluded && !isExcluded && (mw as any).__sprintMiddlewareSchema) {
+                            const mwSchema = (mw as any).__sprintMiddlewareSchema;
+                            
+                            if (mwSchema.queryParams) {
+                                const params = this.zodParamsToOpenAPI(mwSchema.queryParams);
+                                if (params.length > 0) allParams.push(...params);
+                            }
+                            
+                            if (mwSchema.headers) {
+                                const headers = this.zodHeadersToOpenAPI(mwSchema.headers);
+                                if (headers.length > 0) allParams.push(...headers);
+                            }
+                            
+                            if (mwSchema.sprint?.authorization) {
+                                const authSchema = mwSchema.sprint.authorization;
+                                const description = authSchema._def?.description;
+                                let sources: string[] = ["query:token", "headers:authorization"];
+                                
+                                if (description) {
+                                    try {
+                                        const parsed = JSON.parse(description);
+                                        if (parsed.__sprintAuthorization && parsed.sources) sources = Array.isArray(parsed.sources) ? parsed.sources : [parsed.sources];
+                                    } catch {}
+                                }
+                                
+                                const isRequired = sources.length === 1;
+                                
+                                for (const source of sources) {
+                                    const [type, key] = source.split(":");
+                                    if (type === "query") {
+                                        allParams.push({
+                                            name: key,
+                                            in: "query",
+                                            required: isRequired,
+                                            schema: { type: "string" }
+                                        });
+                                    } else if (type === "headers") {
+                                        allParams.push({
+                                            name: key,
+                                            in: "header",
+                                            required: isRequired,
+                                            schema: { type: "string" }
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn("[Sprint] Failed to add middleware schemas to OpenAPI:", e);
+                }
+            }
+
+            if (allParams.length > 0) {
+                const uniqueParams = allParams.filter((param, index, self) => index === self.findIndex((p) => p.name === param.name && p.in === param.in));
+                routeSpec.parameters = uniqueParams;
             }
 
             paths[route.path][method] = routeSpec;
@@ -533,36 +655,25 @@ export class Sprint {
                 
                 let propSchema: any = {};
                 
-                if (typeName === "ZodString") {
-                    propSchema = { type: "string" };
-                } else if (typeName === "ZodNumber") {
-                    propSchema = { type: "number" };
-                } else if (typeName === "ZodBoolean") {
-                    propSchema = { type: "boolean" };
-                } else if (typeName === "ZodArray") {
-                    propSchema = { type: "array", items: this.zodSchemaToOpenAPI(zodDef?.type) };
-                } else if (typeName === "ZodObject") {
-                    propSchema = this.zodSchemaToOpenAPI(zodDef?.type);
-                } else if (typeName === "ZodOptional") {
-                    // Skip required check
-                    continue;
-                } else {
-                    propSchema = { type: "string" };
-                }
+                if (typeName === "ZodString") propSchema = { type: "string" };
+                else if (typeName === "ZodNumber") propSchema = { type: "number" };
+                else if (typeName === "ZodBoolean") propSchema = { type: "boolean" };
+                else if (typeName === "ZodArray") propSchema = { type: "array", items: this.zodSchemaToOpenAPI(zodDef?.type) };
+                else if (typeName === "ZodObject") propSchema = this.zodSchemaToOpenAPI(zodDef?.type);
+                else if (typeName === "ZodOptional") continue;
+                else propSchema = { type: "string" };
                 
                 properties[key] = propSchema;
                 
                 // Check if required (not optional)
-                if (!zodDef?.isOptional && typeName !== "ZodOptional") {
-                    required.push(key);
-                }
+                if (!zodDef?.isOptional && typeName !== "ZodOptional") required.push(key);
             }
             
             return { type: "object", properties, required: required.length > 0 ? required : undefined };
         }
         
         return {};
-    }
+    };
 
     private zodParamsToOpenAPI(schema: any): any[] {
         if (!schema) return [];
@@ -578,15 +689,10 @@ export class Sprint {
             
             let paramSchema: any = {};
             
-            if (typeName === "ZodString") {
-                paramSchema = { type: "string" };
-            } else if (typeName === "ZodNumber") {
-                paramSchema = { type: "number" };
-            } else if (typeName === "ZodBoolean") {
-                paramSchema = { type: "boolean" };
-            } else {
-                paramSchema = { type: "string" };
-            }
+            if (typeName === "ZodString") paramSchema = { type: "string" };
+            else if (typeName === "ZodNumber") paramSchema = { type: "number" };
+            else if (typeName === "ZodBoolean") paramSchema = { type: "boolean" };
+            else paramSchema = { type: "string" };
             
             params.push({
                 name: key,
@@ -597,7 +703,37 @@ export class Sprint {
         }
         
         return params;
-    }
+    };
+
+    private zodHeadersToOpenAPI(schema: any): any[] {
+        if (!schema) return [];
+        
+        const headers: any[] = [];
+        const shape = schema.shape || schema._def?.shape();
+        
+        if (!shape) return [];
+        
+        for (const [key, value] of Object.entries(shape)) {
+            const zodDef = (value as any)._def;
+            const typeName = zodDef?.typeName;
+            
+            let paramSchema: any = {};
+            
+            if (typeName === "ZodString") paramSchema = { type: "string" };
+            else if (typeName === "ZodNumber") paramSchema = { type: "number" };
+            else if (typeName === "ZodBoolean") paramSchema = { type: "boolean" };
+            else paramSchema = { type: "string" };
+            
+            headers.push({
+                name: key,
+                in: "header",
+                required: !zodDef?.isOptional,
+                schema: paramSchema
+            });
+        }
+        
+        return headers;
+    };
 
     // HTTP Methods (prefix is applied automatically).
     public get(path: string, handler: Handler) { return this.app.get(this.applyPrefix(path), handler); }
