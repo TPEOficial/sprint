@@ -58,10 +58,7 @@ export function matchesPatterns(patterns: string[], routePath: string): boolean 
  * Example: "(group)/(subgroup)/api/users" -> "/api/users"
  */
 export function stripRouteGroups(routePath: string): string {
-    return routePath
-        .split("/")
-        .filter(segment => !(/^\(.+\)$/.test(segment)))
-        .join("/") || "/";
+    return routePath.split("/").filter(segment => !(/^\(.+\)$/.test(segment))).join("/") || "/";
 };
 
 export function deepMerge<T>(target: T, source: Partial<T>): T {
