@@ -254,7 +254,7 @@ export class Sprint {
                                     "font-src 'self' https:;"
                                 );
                                 res.type("html");
-                                res.end(ruruHTML({ endpoint: this.graphql.path }));
+                                res.end(ruruHTML({ endpoint: this.graphql.path }).replace(/<title>.*?<\/title>/, "<title>Sprint GraphQL IDE</title>"));
                             });
                             
                             if (isVerbose) console.log(`[Sprint] GraphiQL IDE: http://localhost:${this.port}${this.graphql.graphiql.path}`);
