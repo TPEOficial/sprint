@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://sprint-node.dev/docs
+    about: Check the official documentation
+  - name: Discord
+    url: https://discord.gg/sprint
+    about: Join our community Discord
