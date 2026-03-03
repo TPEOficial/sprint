@@ -25,5 +25,8 @@ export { getExampleCronJob } from "./cronjobs.js";
 // Docker
 export { getDockerfile, getDockerCompose } from "./docker.js";
 
+// GraphQL
+export { getGraphQLFiles } from "./graphql.js";
+
 // Misc
 export { getGitignore, getDockerIgnore } from "./misc.js";

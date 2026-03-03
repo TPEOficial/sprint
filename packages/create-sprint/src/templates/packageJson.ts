@@ -14,9 +14,9 @@ export function generateJWTKeys(): JWTKeys {
     return keys;
 };
 
-export function getTypeScriptPackageJson(name: string, telemetry: string, swagger: boolean) {
+export function getTypeScriptPackageJson(name: string, telemetry: string, swagger: boolean, graphql: boolean) {
     const deps: Record<string, string> = {
-        "sprint-es": "^0.0.81"
+        "sprint-es": "^0.0.86"
     };
 
     const devDeps: Record<string, string> = {
@@ -30,6 +30,12 @@ export function getTypeScriptPackageJson(name: string, telemetry: string, swagge
 
     if (swagger) deps["swagger-ui-express"] = "^5.0.0";
     if (swagger) devDeps["@types/swagger-ui-express"] = "^4.1.8";
+
+    if (graphql) {
+        deps["graphql"] = "^16.13.0";
+        deps["graphql-http"] = "^1.22.4";
+        deps["ruru"] = "^2.0.0-rc.6";
+    }
 
     return {
         name: name === "." ? "sprint-app" : name,
@@ -48,15 +54,21 @@ export function getTypeScriptPackageJson(name: string, telemetry: string, swagge
     };
 };
 
-export function getJavaScriptPackageJson(name: string, telemetry: string, swagger: boolean) {
+export function getJavaScriptPackageJson(name: string, telemetry: string, swagger: boolean, graphql: boolean) {
     const deps: Record<string, string> = {
-        "sprint-es": "^0.0.81"
+        "sprint-es": "^0.0.86"
     };
 
     if (telemetry === "sentry" || telemetry === "glitchtip") deps["@sentry/node"] = "^8.0.0";
     else if (telemetry === "discord") deps["axios"] = "^1.6.0";
     
     if (swagger) deps["swagger-ui-express"] = "^5.0.0";
+
+    if (graphql) {
+        deps["graphql"] = "^16.13.0";
+        deps["graphql-http"] = "^1.22.4";
+        deps["ruru"] = "^2.0.0-rc.6";
+    }
 
     return {
         name: name === "." ? "sprint-app" : name,

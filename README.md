@@ -35,6 +35,10 @@ npx -y create-sprint@latest
  ┃ ┃ ┗ 📜home.{ts.js}
  ┃ ┣ 📂cronjobs
  ┃ ┃ ┗ 📜example.{ts.js}
+ ┃ ┣ 📂graphql (It depends on specs)
+ ┃ ┃ ┣ 📜resolvers.{ts.js}
+ ┃ ┃ ┣ 📜schema.{ts.js}
+ ┃ ┃ ┗ 📜types.{ts.js}
  ┃ ┣ 📂middlewares
  ┃ ┃ ┣ 📜auth.internal.{ts.js}
  ┃ ┃ ┗ 📜auth.user.{ts.js}
@@ -105,6 +109,7 @@ docker compose up -d
 | Validation scheme and documentation generation system                  | 🟢 Active      |
 | Automatic generation of OpenAPI + Swagger UI                  | 🟢 Active      |
 | Sprint Doctor for detecting anti-patterns                  | 🟢 Active      |
+| Support for GraphQL and GraphiQL                   | 🟢 Active      |
 | Preconfigured health check and 404 error pages                         | 🟢 Active      |
 | Anti-directory listing rate limiting system                            | 🟢 Active      |
 | Logger module included to reduce memory consumption                   | 🟢 Active      |
@@ -112,7 +117,7 @@ docker compose up -d
 | Encrypted JWT (JWE-like with AES-256-GCM)                             | 🟢 Active      |
 | Token pairs (access + refresh tokens)                                 | 🟢 Active      |
 | CronJobs scheduler with node-cron                                      | 🟢 Active      |
-| Agnostic Telemetry (Sentry, GlitchTip, Discord)                       | 🟢 Active      |
+| Agnostic Telemetry (OpenTelemetry, Sentry, GlitchTip, Discord, Telegram, Nodemailer...)                       | 🟢 Active      |
 
 ```ts
 import Sprint from "sprint-es";

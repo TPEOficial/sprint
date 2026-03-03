@@ -98,10 +98,21 @@ export interface SprintOptions {
     autoListen?: boolean;
 
     openapi?: {
-        enabled?: boolean;
-        generateOnBuild?: boolean;
+        enabled?: boolean | string[];
+        generateOnBuild?: boolean | string[];
+        path?: string;
         swaggerUi?: {
-            enabled?: boolean;
+            enabled?: boolean | string[];
+            path?: string;
+        };
+    };
+
+    graphql?: {
+        enabled?: boolean | string[];
+        path?: string;
+        graphiql?: {
+            enabled?: boolean | string[];
+            path?: string;
         };
     };
 }
@@ -116,10 +127,20 @@ export interface SprintConfig {
     prefix?: string;
     autoListen?: boolean;
     openapi?: {
-        enabled?: boolean;
-        generateOnBuild?: boolean;
+        enabled?: boolean | string[];
+        generateOnBuild?: boolean | string[];
+        path?: string;
         swaggerUi?: {
-            enabled?: boolean;
+            enabled?: boolean | string[];
+            path?: string;
+        };
+    };
+    graphql?: {
+        enabled?: boolean | string[];
+        path?: string;
+        graphiql?: {
+            enabled?: boolean | string[];
+            path?: string;
         };
     };
 }

@@ -1,8 +1,28 @@
-export function getMainFile(language: string) {
-    if (language === "typescript") {
+export function getMainFile(language: string, graphql: boolean = false) {
+    const isTs = language === "typescript";
+    const ext = isTs ? "" : ".js";
+    
+    if (isTs) {
+        if (graphql) {
+            return `import Sprint from "sprint-es";
+import { graphqlSchema } from "./graphql/schema";
+
+const app = new Sprint();
+app.setGraphQLSchema(graphqlSchema);
+`;
+        }
         return `import Sprint from "sprint-es";
 
 const app = new Sprint();
+`;
+    }
+
+    if (graphql) {
+        return `import Sprint from "sprint-es";
+import { graphqlSchema } from "./graphql/schema.js";
+
+const app = new Sprint();
+app.setGraphQLSchema(graphqlSchema);
 `;
     }
 

@@ -26,6 +26,16 @@ const limiter = new RateLimiter({
 export const isDevelopment = isDev;
 export const isProduction = isProd;
 
+function isEnabledInEnv(value: boolean | string[] | undefined): boolean {
+    if (value === undefined) return false;
+    if (typeof value === "boolean") return value;
+    if (Array.isArray(value)) {
+        const env = nodeEnv || "development";
+        return value.includes(env);
+    }
+    return false;
+}
+
 async function findProjectRoot(startDir: string): Promise<string | null> {
     let currentDir = startDir;
     while (currentDir !== path.parse(currentDir).root) {
@@ -78,15 +88,35 @@ export class Sprint {
     private loadedMiddlewares: LoadedMiddleware[] = [];
     private openapi: {
         generateOnBuild: boolean;
+        path: string;
         swaggerUi: {
             enabled: boolean;
+            path: string;
         };
     } = { 
         generateOnBuild: false,
+        path: "/openapi.json",
         swaggerUi: {
-            enabled: false
+            enabled: false,
+            path: "/swagger"
         }
     };
+    private graphql: {
+        enabled: boolean;
+        path: string;
+        graphiql: {
+            enabled: boolean;
+            path: string;
+        };
+    } = {
+        enabled: false,
+        path: "/graphql",
+        graphiql: {
+            enabled: false,
+            path: "/grapiql"
+        }
+    };
+    private graphqlSchema: any = null;
     private registeredRoutes: Array<{
         method: string;
         path: string;
@@ -111,6 +141,12 @@ export class Sprint {
                     swaggerUi: {
                         enabled: false
                     }
+                },
+                graphql: {
+                    enabled: false,
+                    graphiql: {
+                        enabled: false
+                    }
                 }
             };
 
@@ -124,11 +160,47 @@ export class Sprint {
             this.urlEncodedLimit = finalConfig.urlEncodedLimit || "50mb";
             this.prefix = finalConfig.prefix ? ("/" + finalConfig.prefix.replace(/^\/+|\/+$/g, "")) : "";
             this.openapi = {
-                generateOnBuild: finalConfig.openapi?.generateOnBuild ?? false,
+                generateOnBuild: isEnabledInEnv(finalConfig.openapi?.generateOnBuild),
+                path: finalConfig.openapi?.path || "/openapi.json",
                 swaggerUi: {
-                    enabled: finalConfig.openapi?.swaggerUi?.enabled ?? false
+                    enabled: isEnabledInEnv(finalConfig.openapi?.swaggerUi?.enabled),
+                    path: finalConfig.openapi?.swaggerUi?.path || "/swagger"
                 }
             };
+            this.graphql = {
+                enabled: isEnabledInEnv(finalConfig.graphql?.enabled),
+                path: finalConfig.graphql?.path || "/graphql",
+                graphiql: {
+                    enabled: isEnabledInEnv(finalConfig.graphql?.graphiql?.enabled),
+                    path: finalConfig.graphql?.graphiql?.path || "/grapiql"
+                }
+            };
+
+            const openApiPath = this.openapi.path;
+            const swaggerPath = this.openapi.swaggerUi.path;
+            const graphqlPath = this.graphql.path;
+            const graphiqlPath = this.graphql.graphiql.path;
+
+            const normalizePath = (p: string) => p.replace(/\/+/g, "/").replace(/\/$/, "") || "/";
+
+            const paths = [
+                { name: "openapi.path", value: normalizePath(openApiPath) },
+                { name: "openapi.swaggerUi.path", value: normalizePath(swaggerPath) },
+                { name: "graphql.path", value: normalizePath(graphqlPath) },
+                { name: "graphql.graphiql.path", value: normalizePath(graphiqlPath) }
+            ];
+
+            const uniquePaths = new Map<string, string>();
+            for (const p of paths) {
+                if (uniquePaths.has(p.value)) {
+                    console.error(`[Sprint] Error: Route conflict detected!`);
+                    console.error(`  - "${p.name}" = "${p.value}"`);
+                    console.error(`  - Conflicts with: "${uniquePaths.get(p.value)}"`);
+                    console.error(`  Please use different paths for each endpoint.`);
+                    process.exit(1);
+                }
+                uniquePaths.set(p.value, p.name);
+            }
 
             this.loadDefaults();
             this.loadHealthcheck();
@@ -136,15 +208,15 @@ export class Sprint {
 
             this.routesLoaded.then(async () => {
                 if (this.openapi.generateOnBuild) {
-                    this.app.get("/openapi.json", (_, res) => {
+                    this.app.get(this.openapi.path, (_, res) => {
                         res.json(this.generateOpenAPISpec());
                     });
 
-                    if (finalConfig.openapi?.swaggerUi?.enabled) {
+                    if (this.openapi.swaggerUi.enabled) {
                         try {
                             const swaggerUi = await import("swagger-ui-express");
                             const ui = swaggerUi.default;
-                            this.app.use("/swagger", (req, res, next) => {
+                            this.app.use(this.openapi.swaggerUi.path, (req, res, next) => {
                                 res.setHeader(
                                     "Content-Security-Policy",
                                     "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https:"
@@ -152,12 +224,45 @@ export class Sprint {
                                 next();
                             });
 
-                            this.app.use("/swagger", ui.serve, ui.setup(undefined, {
-                                swaggerUrl: "/openapi.json"
+                            this.app.use(this.openapi.swaggerUi.path, ui.serve, ui.setup(undefined, {
+                                swaggerUrl: this.openapi.path
                             }));
                         } catch (err) {
                             console.warn("[Sprint] Failed to load swagger-ui-express:", err);
                         }
+                    }
+                }
+
+                if (this.graphql.enabled) {
+                    try {
+                        const { createHandler } = await import("graphql-http/lib/use/express");
+                        const { ruruHTML } = await import("ruru/server");
+                        
+                        this.app.all(this.graphql.path, createHandler({
+                            schema: this.graphqlSchema
+                        }));
+
+                        if (this.graphql.graphiql.enabled) {
+                            this.app.get(this.graphql.graphiql.path, (_, res) => {
+                                res.setHeader(
+                                    "Content-Security-Policy",
+                                    "default-src 'self'; " +
+                                    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com; " +
+                                    "style-src 'self' 'unsafe-inline' https://unpkg.com; " +
+                                    "img-src 'self' data: https:; " +
+                                    "connect-src 'self' https:; " +
+                                    "font-src 'self' https:;"
+                                );
+                                res.type("html");
+                                res.end(ruruHTML({ endpoint: this.graphql.path }));
+                            });
+                            
+                            if (isVerbose) console.log(`[Sprint] GraphiQL IDE: http://localhost:${this.port}${this.graphql.graphiql.path}`);
+                        }
+
+                        if (isVerbose) console.log(`[Sprint] GraphQL endpoint: http://localhost:${this.port}${this.graphql.path}`);
+                    } catch (err) {
+                        console.warn("[Sprint] Failed to load graphql-http or ruru:", err);
                     }
                 }
 
@@ -753,6 +858,10 @@ export class Sprint {
         return this.app.use(pathOrHandler as Handler);
     };
 
+    public setGraphQLSchema(schema: any): void {
+        this.graphqlSchema = schema;
+    };
+
 public listen(callback?: () => void): void {
         const isDev = process.env.NODE_ENV === "development";
         const basePort = this.app.get("port") || 5000;
@@ -776,11 +885,14 @@ public listen(callback?: () => void): void {
                 console.log("");
                 console.log(`   ${bold}${cyan}Sprint${reset}  ready to handle requests`);
                 console.log("");
-                console.log(`   ${dim}Local:${reset}        http://localhost:${bold}${port}${reset}`);
-                console.log(`   ${dim}Prefix:${reset}       ${bold}${prefixInfo}${reset}`);
-                console.log(`   ${dim}Healthcheck:${reset}  http://localhost:${port}${this.prefix}/healthcheck`);
-                if (this.openapi.generateOnBuild) console.log(`   ${dim}OpenAPI Spec:${reset} http://localhost:${port}${this.prefix}/openapi.json`);    
-                if (this.openapi.swaggerUi.enabled) console.log(`   ${dim}Swagger UI:${reset}   http://localhost:${port}${this.prefix}/swagger`);
+                console.log(`   ${dim}Local:${reset}                http://localhost:${bold}${port}${reset}`);
+                console.log(`   ${dim}Prefix:${reset}               ${bold}${prefixInfo}${reset}`);
+                console.log(`   ${dim}Healthcheck:${reset}          http://localhost:${port}${this.prefix}/healthcheck`);
+                if (this.openapi.generateOnBuild) console.log(`   ${dim}OpenAPI Spec:${reset}         http://localhost:${port}${this.prefix}/openapi.json`);    
+                if (this.openapi.swaggerUi.enabled) console.log(`   ${dim}Swagger UI:${reset}           http://localhost:${port}${this.prefix}/swagger`);
+                console.log("");
+                console.log(`   ${dim}GraphQL API:${reset}          http://localhost:${port}${this.prefix}/graphql`);
+                console.log(`   ${dim}GraphQL Playground:${reset}   http://localhost:${port}${this.prefix}/graphiql`);
                 console.log("");
                 console.log(`   ${dim}Tip: Need stronger route protection? Learn more at${reset}`);
                 console.log(`   ${dim}https://docs.tpeoficial.com/docs/dymo-api/private/request-verifier${reset}`);

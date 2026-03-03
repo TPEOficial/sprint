@@ -38,7 +38,10 @@ export default defineConfig({
                 "toolkitify/logger",
                 "@sentry/node",
                 "zod",
-                "swagger-ui-express"
+                "swagger-ui-express",
+                "graphql",
+                "graphql-http/lib/use/express",
+                "ruru/server"
             ],
             output: [
                 {

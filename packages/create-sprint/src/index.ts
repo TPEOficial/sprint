@@ -5,13 +5,14 @@ import { join } from "path";
 import color from "picocolors";
 import * as p from "@clack/prompts";
 import { validateProjectName } from "./validators.js";
-import { getTypeScriptPackageJson, getJavaScriptPackageJson, getTsConfig, getViteConfig, getMainFile, getHomeRoute, getAdminRoute, getHomeController, getAdminController, getEnvExample, getInternalAuthMiddleware, getUserAuthMiddleware, getHomeSchema, getAdminSchema, getDockerfile, getDockerCompose, getGitignore, getDockerIgnore, getSprintConfigFile, getEnvDevelopment, getEnvProduction, getExampleCronJob } from "./generators.js";
+import { getTypeScriptPackageJson, getJavaScriptPackageJson, getTsConfig, getViteConfig, getMainFile, getHomeRoute, getAdminRoute, getHomeController, getAdminController, getEnvExample, getInternalAuthMiddleware, getUserAuthMiddleware, getHomeSchema, getAdminSchema, getDockerfile, getDockerCompose, getGitignore, getDockerIgnore, getSprintConfigFile, getEnvDevelopment, getEnvProduction, getExampleCronJob, getGraphQLFiles } from "./generators.js";
 
 export interface CLIOptions {
     projectName?: string;
     language?: "typescript" | "javascript";
     telemetry?: "none" | "sentry" | "glitchtip" | "discord";
     swagger?: boolean;
+    graphql?: boolean;
     docker?: boolean;
     skipInstall?: boolean;
     skipPrompts?: boolean;
@@ -34,6 +35,7 @@ export async function runCLI(args: string[]) {
         language: "typescript" | "javascript";
         telemetry: string;
         swagger: boolean;
+        graphql: boolean;
         docker: boolean;
     };
 
@@ -43,6 +45,7 @@ export async function runCLI(args: string[]) {
             language: options.language || "typescript",
             telemetry: options.telemetry || "none",
             swagger: options.swagger ?? true,
+            graphql: options.graphql ?? false,
             docker: options.docker || false,
         };
     } else {
@@ -69,17 +72,20 @@ export async function runCLI(args: string[]) {
                         message: "Error tracking:",
                         options: [
                             { value: "none", label: "None" },
+                            { value: "open-telemetry", label: "OpenTelemetry", hint: "flexible, open standard", disabled: true },
                             { value: "sentry", label: "Sentry", hint: "free tier available" },
                             { value: "glitchtip", label: "GlitchTip", hint: "self-hostable" },
                             { value: "discord", label: "Discord Webhook", hint: "sends to a channel" },
-                        ],
+                            { value: "telegram", label: "Telegram Bot", hint: "sends to a chat", disabled: true },
+                            { value: "nodemailer", label: "Nodemailer", hint: "sends emails", disabled: true }
+                        ]
                     }),
 
-                swagger: () =>
-                    p.confirm({ message: "Add Swagger UI & OpenAPI?", initialValue: true }),
+                swagger: () => p.confirm({ message: "Add Swagger UI & OpenAPI?", initialValue: true }),
 
-                docker: () =>
-                    p.confirm({ message: "Add Docker support?", initialValue: false }),
+                graphql: () => p.confirm({ message: "Add GraphQL support?", initialValue: false }),
+
+                docker: () => p.confirm({ message: "Add Docker support?", initialValue: false }),
             },
             {
                 onCancel: () => {
@@ -99,6 +105,7 @@ export async function runCLI(args: string[]) {
         config.language,
         config.telemetry,
         config.swagger,
+        config.graphql,
         config.docker
     );
     s.stop("Project created");
@@ -169,6 +176,9 @@ function parseArgs(args: string[]): CLIOptions {
     if (args.includes("--swagger")) options.swagger = true;
     else if (args.includes("--no-swagger")) options.swagger = false;
     
+    if (args.includes("--graphql")) options.graphql = true;
+    else if (args.includes("--no-graphql")) options.graphql = false;
+    
     if (args.includes("--no-install")) options.skipInstall = true;
 
     if (telemetryArg && ["sentry", "glitchtip", "discord", "none"].includes(telemetryArg)) options.telemetry = telemetryArg as CLIOptions["telemetry"];
@@ -181,6 +191,7 @@ async function createProject(
     language: "typescript" | "javascript",
     telemetry: string,
     swagger: boolean,
+    graphql: boolean,
     useDocker: boolean
 ) {
     const isCurrentDir = projectName === ".";
@@ -194,16 +205,16 @@ async function createProject(
     if (!isCurrentDir) await mkdir(targetDir, { recursive: true });
 
     let pkgJson;
-    if (language === "typescript") pkgJson = getTypeScriptPackageJson(projectName, telemetry, swagger);
-    else pkgJson = getJavaScriptPackageJson(projectName, telemetry, swagger);
+    if (language === "typescript") pkgJson = getTypeScriptPackageJson(projectName, telemetry, swagger, graphql);
+    else pkgJson = getJavaScriptPackageJson(projectName, telemetry, swagger, graphql);
     
     await writeFile(join(targetDir, "package.json"), JSON.stringify(pkgJson, null, 2));
 
     if (language === "typescript") {
         await writeFile(join(targetDir, "tsconfig.json"), getTsConfig());
         await writeFile(join(targetDir, "vite.config.ts"), getViteConfig());
-        await writeFile(join(targetDir, "sprint.config.ts"), getSprintConfigFile(language, telemetry, swagger));
-    } else await writeFile(join(targetDir, "sprint.config.js"), getSprintConfigFile(language, telemetry, swagger));
+        await writeFile(join(targetDir, "sprint.config.ts"), getSprintConfigFile(language, telemetry, swagger, graphql));
+    } else await writeFile(join(targetDir, "sprint.config.js"), getSprintConfigFile(language, telemetry, swagger, graphql));
     
     const srcDir = join(targetDir, "src");
     await mkdir(srcDir, { recursive: true });
@@ -215,6 +226,10 @@ async function createProject(
     await mkdir(join(srcDir, "cronjobs"), { recursive: true });
     await mkdir(join(srcDir, "config"), { recursive: true });
     await mkdir(join(srcDir, "services"), { recursive: true });
+    
+    if (graphql) {
+        await mkdir(join(srcDir, "graphql"), { recursive: true });
+    }
 
     if (language === "typescript") {
         await writeFile(join(srcDir, "config", "index.ts"), "");
@@ -226,7 +241,7 @@ async function createProject(
 
     await writeFile(join(srcDir, "services", ".gitkeep"), "");
 
-    await writeFile(join(srcDir, "app." + (language === "typescript" ? "ts" : "js")), getMainFile(language));
+    await writeFile(join(srcDir, "app." + (language === "typescript" ? "ts" : "js")), getMainFile(language, graphql));
 
     await writeFile(join(srcDir, "routes", "home." + (language === "typescript" ? "ts" : "js")), getHomeRoute(language));
     await writeFile(join(srcDir, "routes", "admin." + (language === "typescript" ? "ts" : "js")), getAdminRoute(language));
@@ -241,6 +256,15 @@ async function createProject(
     await writeFile(join(srcDir, "schemas", "admin." + (language === "typescript" ? "ts" : "js")), getAdminSchema(language));
 
     await writeFile(join(srcDir, "cronjobs", "example." + (language === "typescript" ? "ts" : "js")), getExampleCronJob(language));
+
+    if (graphql) {
+        const graphqlFiles = getGraphQLFiles(language);
+        const ext = language === "typescript" ? "ts" : "js";
+        
+        await writeFile(join(srcDir, "graphql", `types.${ext}`), graphqlFiles["types.ts"]);
+        await writeFile(join(srcDir, "graphql", `resolvers.${ext}`), graphqlFiles["resolvers.ts"]);
+        await writeFile(join(srcDir, "graphql", `schema.${ext}`), graphqlFiles["schema.ts"]);
+    }
 
     await writeFile(join(targetDir, ".env.development.example"), getEnvExample(telemetry));
     await writeFile(join(targetDir, ".env.production.example"), getEnvExample(telemetry));
