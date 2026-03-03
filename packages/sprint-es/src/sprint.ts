@@ -417,14 +417,17 @@ export class Sprint {
     };
 
     private loadHealthcheck(): void {
-        const healthcheckXml = `<?xml version="1.0" encoding="UTF-8"?>
+        const healthRoutes = this.prefix
+            ? [`${this.prefix}/health`, `${this.prefix}/healthcheck`]
+            : ["/health", "/healthcheck"];
+
+        this.app.get(healthRoutes, (_, res) => {
+            const healthcheckXml = `<?xml version="1.0" encoding="UTF-8"?>
 <health>
     <status>ok</status>
     <uptime>${process.uptime().toFixed(2)}</uptime>
 </health>`;
 
-        const healthRoute = this.prefix ? `${this.prefix}/healthcheck` : "/healthcheck";
-        this.app.get(healthRoute, (_, res) => {
             res.setHeader("Content-Type", "application/xml");
             res.send(healthcheckXml);
         });
@@ -887,12 +890,13 @@ public listen(callback?: () => void): void {
                 console.log("");
                 console.log(`   ${dim}Local:${reset}                http://localhost:${bold}${port}${reset}`);
                 console.log(`   ${dim}Prefix:${reset}               ${bold}${prefixInfo}${reset}`);
-                console.log(`   ${dim}Healthcheck:${reset}          http://localhost:${port}${this.prefix}/healthcheck`);
-                if (this.openapi.generateOnBuild) console.log(`   ${dim}OpenAPI Spec:${reset}         http://localhost:${port}${this.prefix}/openapi.json`);    
-                if (this.openapi.swaggerUi.enabled) console.log(`   ${dim}Swagger UI:${reset}           http://localhost:${port}${this.prefix}/swagger`);
-                console.log("");
-                console.log(`   ${dim}GraphQL API:${reset}          http://localhost:${port}${this.prefix}/graphql`);
-                console.log(`   ${dim}GraphQL Playground:${reset}   http://localhost:${port}${this.prefix}/graphiql`);
+                console.log(`   ${dim}Healthcheck:${reset}          http://localhost:${port}/healthcheck ${dim}(also available at /health)${reset}`);
+                if (this.openapi.generateOnBuild || this.openapi.swaggerUi.enabled) console.log("");
+                if (this.openapi.generateOnBuild) console.log(`   ${dim}OpenAPI Spec:${reset}         http://localhost:${port}${this.openapi.path}`);    
+                if (this.openapi.swaggerUi.enabled) console.log(`   ${dim}Swagger UI:${reset}           http://localhost:${port}${this.openapi.swaggerUi.path}`);
+                if (this.graphql.enabled || this.graphql.graphiql.enabled) console.log("");
+                if (this.graphql.enabled) console.log(`   ${dim}GraphQL API:${reset}          http://localhost:${port}${this.graphql.path}`);
+                if (this.graphql.graphiql.enabled) console.log(`   ${dim}GraphQL Playground:${reset}   http://localhost:${port}${this.graphql.graphiql.path}`);
                 console.log("");
                 console.log(`   ${dim}Tip: Need stronger route protection? Learn more at${reset}`);
                 console.log(`   ${dim}https://docs.tpeoficial.com/docs/dymo-api/private/request-verifier${reset}`);

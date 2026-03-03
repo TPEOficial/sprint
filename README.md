@@ -65,7 +65,6 @@ npx -y create-sprint@latest
  ┣ 📜tsconfig.json (It depends on specs)
  ┗ 📜vite.config.ts (It depends on specs)
 ```
-
 </details>
 
 This will create a new Sprint project in the current directory with:
@@ -118,6 +117,20 @@ docker compose up -d
 | Token pairs (access + refresh tokens)                                 | 🟢 Active      |
 | CronJobs scheduler with node-cron                                      | 🟢 Active      |
 | Agnostic Telemetry (OpenTelemetry, Sentry, GlitchTip, Discord, Telegram, Nodemailer...)                       | 🟢 Active      |
+
+
+<details>
+  <summary>Default routes reserved for Sprint</summary>
+
+```
+ - /health
+ - /healthcheck
+ - /openapi.json
+ - /swagger
+ - /graphql
+ - /graphiql
+```
+</details>
 
 ```ts
 import Sprint from "sprint-es";
@@ -276,7 +289,7 @@ const { accessToken, refreshToken } = createTokenPair(
 const { publicKey, privateKey, encryptionSecret } = getJwtFromEnv();
 ```
 
-More info: https://docs.tpeoficial.com/docs/sprint/jwt
+More info: https://docs.tpeoficial.com/docs/sprint/jwt (Link not yet available)
 
 #### Encrypted JWT
 
@@ -299,7 +312,7 @@ const encryptedToken = signEncrypted(
 const payload = verifyEncrypted(encryptedToken, publicKey, encryptionSecret);
 ```
 
-More info: https://docs.tpeoficial.com/docs/sprint/jwt
+More info: https://docs.tpeoficial.com/docs/sprint/jwt (Link not yet available)
 
 #### CronJobs
 
@@ -326,7 +339,7 @@ console.log(getCronJobs()); // ["cleanup"]
 stopAllCronJobs();
 ```
 
-More info: https://docs.tpeoficial.com/docs/sprint/cronjobs
+More info: https://docs.tpeoficial.com/docs/sprint/cronjobs (Link not yet available)
 
 #### Agnostic Telemetry
 
@@ -367,4 +380,6 @@ captureMessage("User logged in", { level: "info" });
 setUser({ id: "123", email: "user@example.com", username: "john" });
 ```
 
-More info: https://docs.tpeoficial.com/docs/sprint/telemetry
+More info: https://docs.tpeoficial.com/docs/sprint/telemetry (Link not yet available)
+
+<p align="right"><a href="#top">Back to top 🔼</a></p>
