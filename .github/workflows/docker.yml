@@ -1,0 +1,72 @@
+name: Docker Build
+
+on:
+  push:
+    branches: [main, develop]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build sprint-es
+        run: |
+          cd packages/sprint-es
+          npm run build
+      
+      - name: Build create-sprint
+        run: |
+          cd packages/create-sprint
+          npm run build
+      
+      - name: Create test project with Docker
+        run: |
+          cd /tmp
+          rm -rf docker-test
+          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js docker-test --ts --swagger --docker --yes
+          cd docker-test
+          npm install
+          
+      - name: Build Docker image
+        run: |
+          cd /tmp/docker-test
+          docker build -t sprint-test .
+          
+      - name: Run Docker container
+        run: |
+          docker run -d -p 5000:5000 --name sprint-test sprint-test
+          sleep 10
+          curl -s http://localhost:5000/health || exit 1
+          docker stop sprint-test || true
+          docker rm sprint-test || true
+          
+      - name: Build Docker image with GraphQL
+        run: |
+          cd /tmp
+          rm -rf docker-test-graphql
+          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js docker-test-graphql --ts --graphql --docker --yes
+          cd docker-test-graphql
+          npm install
+          docker build -t sprint-test-graphql .
+          
+      - name: Run Docker container with GraphQL
+        run: |
+          docker run -d -p 5001:5000 --name sprint-test-graphql sprint-test-graphql
+          sleep 10
+          curl -s http://localhost:5001/health || exit 1
+          docker stop sprint-test-graphql || true
+          docker rm sprint-test-graphql || true

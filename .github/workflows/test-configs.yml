@@ -1,0 +1,105 @@
+name: Test Configurations
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test-ts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      
+      - name: Install create-sprint
+        run: |
+          cd packages/create-sprint
+          npm install
+          npm run build
+      
+      - name: Test TypeScript with Swagger
+        run: |
+          cd /tmp
+          rm -rf test-ts-swagger
+          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js test-ts-swagger --ts --swagger --yes
+          cd test-ts-swagger
+          npm install
+          npm run build
+          npm run dev &
+          sleep 5
+          curl -s http://localhost:5000/health || exit 1
+          pkill -f "tsx" || true
+      
+      - name: Test TypeScript with GraphQL
+        run: |
+          cd /tmp
+          rm -rf test-ts-graphql
+          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js test-ts-graphql --ts --graphql --yes
+          cd test-ts-graphql
+          npm install
+          npm run build
+          npm run dev &
+          sleep 5
+          curl -s http://localhost:5000/health || exit 1
+          pkill -f "tsx" || true
+      
+      - name: Test TypeScript with Both
+        run: |
+          cd /tmp
+          rm -rf test-ts-both
+          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js test-ts-both --ts --swagger --graphql --yes
+          cd test-ts-both
+          npm install
+          npm run build
+          npm run dev &
+          sleep 5
+          curl -s http://localhost:5000/health || exit 1
+          pkill -f "tsx" || true
+
+  test-js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      
+      - name: Install create-sprint
+        run: |
+          cd packages/create-sprint
+          npm install
+          npm run build
+      
+      - name: Test JavaScript with Swagger
+        run: |
+          cd /tmp
+          rm -rf test-js-swagger
+          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js test-js-swagger --js --swagger --yes
+          cd test-js-swagger
+          npm install
+          npm run dev &
+          sleep 5
+          curl -s http://localhost:5000/health || exit 1
+          pkill -f "tsx" || true
+      
+      - name: Test JavaScript with GraphQL
+        run: |
+          cd /tmp
+          rm -rf test-js-graphql
+          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js test-js-graphql --js --graphql --yes
+          cd test-js-graphql
+          npm install
+          npm run dev &
+          sleep 5
+          curl -s http://localhost:5000/health || exit 1
+          pkill -f "tsx" || true

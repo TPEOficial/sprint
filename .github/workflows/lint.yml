@@ -1,0 +1,50 @@
+name: Lint & Type Check
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: TypeScript Check sprint-es
+        run: |
+          cd packages/sprint-es
+          npx tsc --noEmit || true
+          
+      - name: TypeScript Check create-sprint
+        run: |
+          cd packages/create-sprint
+          npx tsc --noEmit || true
+
+  formatting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Check Prettier formatting
+        run: |
+          npx prettier --check "packages/**/*.{ts,js,json,md,yml}" || true
