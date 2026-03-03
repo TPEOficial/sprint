@@ -48,6 +48,7 @@ jobs:
           npm install
           
       - name: Build & Start with Docker Compose
+        working-directory: /tmp/docker-test
         run: |
           cd /tmp/docker-test
           docker compose up -d --build
