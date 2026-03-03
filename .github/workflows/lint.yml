@@ -17,10 +17,13 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
+          cache-dependency-path: 'packages/**/package-lock.json'
       
       - name: Install dependencies
-        run: npm ci
-      
+        run: |
+          cd packages/sprint-es && npm install
+          cd ../create-sprint && npm install
+       
       - name: TypeScript Check sprint-es
         run: |
           cd packages/sprint-es
@@ -41,9 +44,10 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
+          cache-dependency-path: 'packages/**/package-lock.json'
       
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       
       - name: Check Prettier formatting
         run: |
