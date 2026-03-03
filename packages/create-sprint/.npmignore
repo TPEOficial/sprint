@@ -6,3 +6,4 @@ test/
 example
 src/__tests__/
 jest.config.js
+package-lock.json
