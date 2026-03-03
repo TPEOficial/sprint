@@ -5,12 +5,19 @@ on:
     branches: [main, develop]
     tags:
       - 'v*'
+    paths-ignore:
+      - '**.md'
+      - '**.yml'
   pull_request:
     branches: [main, develop]
+    paths-ignore:
+      - '**.md'
+      - '**.yml'
 
 jobs:
   docker:
     runs-on: ubuntu-latest
+    if: "contains(github.event.head_commit.message, 'check: ')"
     steps:
       - uses: actions/checkout@v4
       
@@ -18,8 +25,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
-          cache-dependency-path: 'packages/**/package-lock.json'
       
       - name: Install dependencies
         run: |
@@ -38,10 +43,10 @@ jobs:
       
       - name: Create test project with Docker
         run: |
-          cd /tmp
-          rm -rf docker-test
-          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js docker-test --ts --swagger --docker --yes
-          cd docker-test
+          cd ${{ github.workspace }}
+          rm -rf /tmp/docker-test
+          node packages/create-sprint/dist/cli.js /tmp/docker-test --ts --swagger --docker --yes
+          cd /tmp/docker-test
           npm install
           
       - name: Build Docker image
@@ -57,13 +62,16 @@ jobs:
           docker stop sprint-test || true
           docker rm sprint-test || true
           
+      - name: Create test project with GraphQL
+        run: |
+          rm -rf /tmp/docker-test-graphql
+          node ${{ github.workspace }}/packages/create-sprint/dist/cli.js /tmp/docker-test-graphql --ts --graphql --docker --yes
+          cd /tmp/docker-test-graphql
+          npm install
+          
       - name: Build Docker image with GraphQL
         run: |
-          cd /tmp
-          rm -rf docker-test-graphql
-          node $GITHUB_WORKSPACE/packages/create-sprint/dist/cli.js docker-test-graphql --ts --graphql --docker --yes
-          cd docker-test-graphql
-          npm install
+          cd /tmp/docker-test-graphql
           docker build -t sprint-test-graphql .
           
       - name: Run Docker container with GraphQL

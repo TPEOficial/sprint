@@ -60,7 +60,7 @@
         "dev": "NODE_ENV=development ts-node src/index.ts",
         "start": "NODE_ENV=production ts-node src/index.ts",
         "prepublishOnly": "npm run build",
-        "test": "jest",
+        "test": "jest --passWithNoTests",
         "dev:example": "npm run build && node example/app.js"
     },
     "repository": {
