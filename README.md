@@ -36,7 +36,6 @@ npx -y create-sprint@latest
  ┃ ┣ 📂cronjobs
  ┃ ┃ ┗ 📜example.{ts.js}
  ┃ ┣ 📂middlewares
- ┃ ┃ ┣ 📜.gitkeep
  ┃ ┃ ┣ 📜auth.internal.{ts.js}
  ┃ ┃ ┗ 📜auth.user.{ts.js}
  ┃ ┣ 📂routes
@@ -45,6 +44,8 @@ npx -y create-sprint@latest
  ┃ ┣ 📂schemas
  ┃ ┃ ┣ 📜admin.{ts.js}
  ┃ ┃ ┗ 📜home.{ts.js}
+ ┃ ┣ 📂services
+ ┃ ┃ ┣ 📜.gitkeep
  ┃ ┗ 📜app.{ts.js}
  ┣ 📜.dockerignore (It depends on specs)
  ┣ 📜.env.development
@@ -54,10 +55,11 @@ npx -y create-sprint@latest
  ┣ 📜.gitignore
  ┣ 📜docker-compose.yml (It depends on specs)
  ┣ 📜Dockerfile (It depends on specs)
+ ┣ 📜package-lock.json (It depends on specs)
  ┣ 📜package.json
  ┣ 📜sprint.config.{ts.js}
  ┣ 📜tsconfig.json (It depends on specs)
- ┗ 📜vite.config.{ts.js}
+ ┗ 📜vite.config.ts (It depends on specs)
 ```
 
 </details>
@@ -94,6 +96,8 @@ docker compose up -d
 | Pre-established security policies                                      | 🟢 Active      |
 | Native support for JSON, formatted and ready to use                    | 🟢 Active      |
 | CORS, Morgan, and similar modules preinstalled                         | 🟢 Active      |
+| Validation scheme and documentation generation system                  | 🟢 Active      |
+| Automatic generation of OpenAPI + Swagger UI                  | 🟢 Active      |
 | Preconfigured health check and 404 error pages                         | 🟢 Active      |
 | Anti-directory listing rate limiting system                            | 🟢 Active      |
 | Logger module included to reduce memory consumption                   | 🟢 Active      |

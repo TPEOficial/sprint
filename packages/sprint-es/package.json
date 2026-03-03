@@ -1,6 +1,6 @@
 {
   "name": "sprint-es",
-  "version": "0.0.54",
+  "version": "0.0.73",
   "description": "Sprint - Quickly API",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -103,6 +103,7 @@
     "@types/node": "^22.18.7",
     "@types/node-cron": "^3.0.11",
     "@types/serve-favicon": "^2.5.7",
+    "@types/swagger-ui-express": "^4.1.8",
     "jest": "^30.1.3",
     "rimraf": "^6.0.1",
     "ts-jest": "^29.4.4",
@@ -110,6 +111,9 @@
     "typescript": "^5.5.4",
     "vite": "^6.4.1",
     "vite-plugin-dts": "^4.5.4"
+  },
+  "optionalDependencies": {
+    "swagger-ui-express": "^5.0.1"
   },
   "prettier": {
     "tabWidth": 4,

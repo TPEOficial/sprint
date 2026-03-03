@@ -14,7 +14,7 @@ interface ZodErrorItem {
     message: string;
 }
 
-function parseSchema(schema: ZodSchemaType<any, ZodTypeDef, any>, data: any): { success: true; data: any } | { success: false; errors: ZodErrorItem[] } {
+function parseSchema(schema: ZodSchemaType<any, ZodTypeDef, any>, data: any): { success: true; data: any; } | { success: false; errors: ZodErrorItem[]; } {
     const result = schema.safeParse(data);
     if (!result.success) {
         return {
@@ -26,39 +26,36 @@ function parseSchema(schema: ZodSchemaType<any, ZodTypeDef, any>, data: any): { 
         };
     }
     return { success: true, data: result.data };
-}
+};
 
 export function defineRouteSchema<T extends RouteSchemaOptions>(schema: T): RequestHandler {
-    return (req, res, next) => {
-        const errors: Array<{ location: string; path: string; message: string }> = [];
+    const middleware: RequestHandler = (req, res, next) => {
+        const errors: Array<{ location: string; path: string; message: string; }> = [];
 
-        if (schema.body && req.body) {
+        if (schema.body) {
             const result = parseSchema(schema.body, req.body);
-            if (!result.success) {
-                errors.push(...result.errors.map((e: ZodErrorItem) => ({ location: "body", ...e })));
-            }
+            if (!result.success) errors.push(...result.errors.map(e => ({ location: "body", ...e })));
         }
 
-        if (schema.queryParams && req.query) {
+        if (schema.queryParams) {
             const result = parseSchema(schema.queryParams, req.query);
-            if (!result.success) {
-                errors.push(...result.errors.map((e: ZodErrorItem) => ({ location: "queryParams", ...e })));
-            }
+            if (!result.success) errors.push(...result.errors.map(e => ({ location: "queryParams", ...e })));
         }
 
-        if (schema.params && req.params) {
+        if (schema.params) {
             const result = parseSchema(schema.params, req.params);
-            if (!result.success) {
-                errors.push(...result.errors.map((e: ZodErrorItem) => ({ location: "params", ...e })));
-            }
+            if (!result.success) errors.push(...result.errors.map(e => ({ location: "params", ...e })));
         }
 
-        if (errors.length > 0) {
-            return res.status(400).json({ error: "Validation failed", details: errors });
-        }
+        if (errors.length > 0) return res.status(400).json({ error: "Validation failed", details: errors });
 
         next();
     };
-}
+
+    // Attach schema to middleware.
+    (middleware as any).__sprintRouteSchema = schema;
+
+    return middleware;
+};
 
 export type { ZodSchema, ZodMiddlewareOptions } from "./types";

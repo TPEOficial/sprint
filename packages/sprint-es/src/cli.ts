@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { spawn } from "child_process";
 import { existsSync } from "fs";
 import * as crypto from "crypto";
 import { resolve, join } from "path";
+import { spawn } from "child_process";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -35,9 +35,7 @@ if (command === "--help" || command === "-h") {
 function getProjectRoot() {
     let dir = process.cwd();
     while (dir !== resolve(dir, "..")) {
-        if (existsSync(join(dir, "sprint.config.ts")) || existsSync(join(dir, "sprint.config.js"))) {
-            return dir;
-        }
+        if (existsSync(join(dir, "sprint.config.ts")) || existsSync(join(dir, "sprint.config.js"))) return dir;
         dir = resolve(dir, "..");
     }
     return process.cwd();

@@ -11,6 +11,7 @@ export interface CLIOptions {
     projectName?: string;
     language?: "typescript" | "javascript";
     telemetry?: "none" | "sentry" | "glitchtip" | "discord";
+    swagger?: boolean;
     docker?: boolean;
     skipInstall?: boolean;
     skipPrompts?: boolean;
@@ -32,6 +33,7 @@ export async function runCLI(args: string[]) {
         projectName: string;
         language: "typescript" | "javascript";
         telemetry: string;
+        swagger: boolean;
         docker: boolean;
     };
 
@@ -40,6 +42,7 @@ export async function runCLI(args: string[]) {
             projectName: options.projectName || "sprint-app",
             language: options.language || "typescript",
             telemetry: options.telemetry || "none",
+            swagger: options.swagger ?? true,
             docker: options.docker || false,
         };
     } else {
@@ -72,6 +75,9 @@ export async function runCLI(args: string[]) {
                         ],
                     }),
 
+                swagger: () =>
+                    p.confirm({ message: "Add Swagger UI & OpenAPI?", initialValue: true }),
+
                 docker: () =>
                     p.confirm({ message: "Add Docker support?", initialValue: false }),
             },
@@ -92,6 +98,7 @@ export async function runCLI(args: string[]) {
         config.projectName,
         config.language,
         config.telemetry,
+        config.swagger,
         config.docker,
     );
     s.stop("Project created");
@@ -164,6 +171,9 @@ function parseArgs(args: string[]): CLIOptions {
 
     if (args.includes("--docker")) options.docker = true;
     
+    if (args.includes("--swagger")) options.swagger = true;
+    else if (args.includes("--no-swagger")) options.swagger = false;
+    
     if (args.includes("--no-install")) options.skipInstall = true;
 
     if (telemetryArg && ["sentry", "glitchtip", "discord", "none"].includes(telemetryArg)) options.telemetry = telemetryArg as CLIOptions["telemetry"];
@@ -175,6 +185,7 @@ async function createProject(
     projectName: string,
     language: "typescript" | "javascript",
     telemetry: string,
+    swagger: boolean,
     useDocker: boolean
 ) {
     const isCurrentDir = projectName === ".";
@@ -188,16 +199,16 @@ async function createProject(
     if (!isCurrentDir) await mkdir(targetDir, { recursive: true });
 
     let pkgJson;
-    if (language === "typescript") pkgJson = getTypeScriptPackageJson(projectName, telemetry);
-    else pkgJson = getJavaScriptPackageJson(projectName, telemetry);
+    if (language === "typescript") pkgJson = getTypeScriptPackageJson(projectName, telemetry, swagger);
+    else pkgJson = getJavaScriptPackageJson(projectName, telemetry, swagger);
     
     await writeFile(join(targetDir, "package.json"), JSON.stringify(pkgJson, null, 2));
 
     if (language === "typescript") {
         await writeFile(join(targetDir, "tsconfig.json"), getTsConfig());
         await writeFile(join(targetDir, "vite.config.ts"), getViteConfig());
-        await writeFile(join(targetDir, "sprint.config.ts"), getSprintConfigFile(language, telemetry));
-    } else await writeFile(join(targetDir, "sprint.config.js"), getSprintConfigFile(language, telemetry));
+        await writeFile(join(targetDir, "sprint.config.ts"), getSprintConfigFile(language, telemetry, swagger));
+    } else await writeFile(join(targetDir, "sprint.config.js"), getSprintConfigFile(language, telemetry, swagger));
     
     const srcDir = join(targetDir, "src");
     await mkdir(srcDir, { recursive: true });
@@ -208,6 +219,7 @@ async function createProject(
     await mkdir(join(srcDir, "schemas"), { recursive: true });
     await mkdir(join(srcDir, "cronjobs"), { recursive: true });
     await mkdir(join(srcDir, "config"), { recursive: true });
+    await mkdir(join(srcDir, "services"), { recursive: true });
 
     if (language === "typescript") {
         await writeFile(join(srcDir, "config", "index.ts"), "");
@@ -217,7 +229,7 @@ async function createProject(
         await writeFile(join(srcDir, "config", "clients.js"), "");
     }
 
-    await writeFile(join(srcDir, "middlewares", ".gitkeep"), "");
+    await writeFile(join(srcDir, "services", ".gitkeep"), "");
 
     await writeFile(join(srcDir, "app." + (language === "typescript" ? "ts" : "js")), getMainFile(language));
 

@@ -81,7 +81,11 @@ export interface SprintOptions {
     autoListen?: boolean;
 
     openapi?: {
+        enabled?: boolean;
         generateOnBuild?: boolean;
+        swaggerUi?: {
+            enabled?: boolean;
+        };
     };
 }
 
@@ -95,7 +99,11 @@ export interface SprintConfig {
     prefix?: string;
     autoListen?: boolean;
     openapi?: {
+        enabled?: boolean;
         generateOnBuild?: boolean;
+        swaggerUi?: {
+            enabled?: boolean;
+        };
     };
 }
 

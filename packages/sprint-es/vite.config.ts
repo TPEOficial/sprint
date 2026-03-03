@@ -37,7 +37,8 @@ export default defineConfig({
                 "toolkitify/cache",
                 "toolkitify/logger",
                 "@sentry/node",
-                "zod"
+                "zod",
+                "swagger-ui-express"
             ],
             output: [
                 {

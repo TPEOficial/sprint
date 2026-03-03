@@ -31,9 +31,9 @@ export function getEnvDevelopment(telemetry: string) {
     const keys = generateJWTKeys();
     let env = `NODE_ENV=development
 PORT=5000
-JWT_PUBLIC_KEY='${keys.publicKey}'
-JWT_PRIVATE_KEY='${keys.privateKey}'
-JWT_ENCRYPTION_SECRET='${crypto.randomBytes(32).toString("hex")}'
+JWT_PUBLIC_KEY="${keys.publicKey}"
+JWT_PRIVATE_KEY="${keys.privateKey}"
+JWT_ENCRYPTION_SECRET="${crypto.randomBytes(32).toString("hex")}"
 `;
 
     if (telemetry === "sentry" || telemetry === "glitchtip") {
@@ -55,20 +55,20 @@ export function getEnvProduction(telemetry: string) {
     const keys = generateJWTKeys();
     let env = `NODE_ENV=production
 PORT=5000
-JWT_PUBLIC_KEY='${keys.publicKey}'
-JWT_PRIVATE_KEY='${keys.privateKey}'
-JWT_ENCRYPTION_SECRET='${crypto.randomBytes(32).toString("hex")}'
+JWT_PUBLIC_KEY="${keys.publicKey}"
+JWT_PRIVATE_KEY="${keys.privateKey}"
+JWT_ENCRYPTION_SECRET="${crypto.randomBytes(32).toString("hex")}"
 `;
 
     if (telemetry === "sentry" || telemetry === "glitchtip") {
         env += `
 # Sentry / GlitchTip
-SENTRY_DSN=
+SENTRY_DSN=""
 `;
     } else if (telemetry === "discord") {
         env += `
 # Discord Webhook URL
-DISCORD_TELEMETRY_WEBHOOK_URL=
+DISCORD_TELEMETRY_WEBHOOK_URL=""
 `;
     }
 

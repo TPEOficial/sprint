@@ -6,7 +6,7 @@ import morgan from "morgan";
 import dotenv from "dotenv";
 import { pathToFileURL } from "url";
 import { RateLimiter } from "toolkitify/rate-limit";
-import { isVerbose, matchesPatterns, stripRouteGroups } from "./utils";
+import { isVerbose, matchesPatterns, stripRouteGroups, deepMerge } from "./utils";
 import { Handler, SprintOptions, SprintConfig, MiddlewareConfig, LoadedMiddleware } from "./types";
 import express, { Application, RequestHandler, Router as ExpressRouter, Request } from "express";
 import { AuthorizationSource, SprintRequest } from "./types";
@@ -37,26 +37,30 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
 };
 
 async function loadSprintConfig(): Promise<SprintConfig | null> {
-    const callerDir = process.argv[1] ? path.dirname(process.argv[1]) : process.cwd();
+    const callerDir = process.cwd();
     const projectRoot = await findProjectRoot(callerDir);
-    
+
     if (!projectRoot) return null;
 
     const configFiles = ["sprint.config.ts", "sprint.config.js"];
-    
+
     for (const configFile of configFiles) {
         const configPath = path.join(projectRoot, configFile);
-        if (fs.existsSync(configPath)) {
-            try {
-                const moduleUrl = pathToFileURL(configPath).href;
-                const config = await import(moduleUrl);
-                return config.default || config;
-            } catch (err) {
-                console.warn(`[Sprint] Failed to load config from ${configPath}:`, err);
-            }
+
+        if (!fs.existsSync(configPath)) continue;
+
+        try {
+            const moduleUrl = pathToFileURL(configPath).href;
+            const module = await import(moduleUrl);
+
+            // Support multiple export styles.
+            return module.default ?? module.config ?? module ?? null;
+
+        } catch (err) {
+            console.warn(`[Sprint] Failed to load config from ${configPath}:`, err);
         }
     }
-    
+
     return null;
 };
 
@@ -74,9 +78,20 @@ export class Sprint {
     private loadedMiddlewares: LoadedMiddleware[] = [];
     private openapi: {
         generateOnBuild: boolean;
+        swaggerUi: {
+            enabled: boolean;
+        };
     } = { 
-        generateOnBuild: false
+        generateOnBuild: false,
+        swaggerUi: {
+            enabled: false
+        }
     };
+    private registeredRoutes: Array<{
+        method: string;
+        path: string;
+        schema: any;
+    }> = [];
 
     constructor() {
         this.app = express();
@@ -84,29 +99,35 @@ export class Sprint {
         loadSprintConfig().then((config) => {
             const defaults: SprintOptions = {
                 port: process.env.PORT,
-                routesPath: "./routes",
-                middlewaresPath: "./middlewares",
-                cronjobsPath: "./cronjobs",
+                routesPath: "./src/routes",
+                middlewaresPath: "./src/middlewares",
+                cronjobsPath: "./src/cronjobs",
                 jsonLimit: "50mb",
                 urlEncodedLimit: "50mb",
                 prefix: "",
                 autoListen: true,
                 openapi: {
-                    generateOnBuild: false
+                    generateOnBuild: false,
+                    swaggerUi: {
+                        enabled: false
+                    }
                 }
             };
 
-            const finalConfig = { ...defaults, ...config };
+            const finalConfig = deepMerge(defaults, config || {});
 
             this.port = finalConfig.port;
-            this.routesPath = finalConfig.routesPath || "./routes";
-            this.middlewaresPath = finalConfig.middlewaresPath || "./middlewares";
-            this.cronjobsPath = finalConfig.cronjobsPath || "./cronjobs";
+            this.routesPath = finalConfig.routesPath || "./src/routes";
+            this.middlewaresPath = finalConfig.middlewaresPath || "./src/middlewares";
+            this.cronjobsPath = finalConfig.cronjobsPath || "./src/cronjobs";
             this.jsonLimit = finalConfig.jsonLimit || "50mb";
             this.urlEncodedLimit = finalConfig.urlEncodedLimit || "50mb";
             this.prefix = finalConfig.prefix ? ("/" + finalConfig.prefix.replace(/^\/+|\/+$/g, "")) : "";
             this.openapi = {
-                generateOnBuild: finalConfig.openapi?.generateOnBuild ?? false
+                generateOnBuild: finalConfig.openapi?.generateOnBuild ?? false,
+                swaggerUi: {
+                    enabled: finalConfig.openapi?.swaggerUi?.enabled ?? false
+                }
             };
 
             if (this.openapi.generateOnBuild === true) console.log(`[Sprint] ⚠️ openapi.generateOnBuild is enabled but this option makes nothing for now`);
@@ -115,12 +136,32 @@ export class Sprint {
             this.loadHealthcheck();
             this.routesLoaded = this.init();
 
-            if (finalConfig.autoListen) this.routesLoaded.then(() => this.listen());
+            this.routesLoaded.then(async () => {
+                if (this.openapi.generateOnBuild) {
+                    this.app.get("/openapi.json", (_, res) => {
+                        res.json(this.generateOpenAPISpec());
+                    });
+
+                    if (finalConfig.openapi?.swaggerUi?.enabled) {
+                        try {
+                            const swaggerUi = await import("swagger-ui-express");
+                            const ui = swaggerUi.default;
+                            this.app.use("/swagger", ui.serve, ui.setup(undefined, {
+                                swaggerUrl: "/openapi.json"
+                            }));
+                        } catch (err) {
+                            console.warn("[Sprint] Failed to load swagger-ui-express:", err);
+                        }
+                    }
+                }
+
+                if (finalConfig.autoListen) this.listen();
+            });
         });
     };
 
     private async init(): Promise<void> {
-        const callerDir = process.argv[1] ? path.dirname(process.argv[1]) : process.cwd();
+        const callerDir = process.cwd();
 
         // Load middlewares first.
         try {
@@ -135,7 +176,6 @@ export class Sprint {
         try {
             const routesCandidate = path.isAbsolute(this.routesPath) ? this.routesPath : path.join(callerDir, this.routesPath);
             if (fs.existsSync(routesCandidate) && fs.statSync(routesCandidate).isDirectory()) await this.loadRoutes(routesCandidate);
-            else console.log(`[Sprint] Routes folder not found at: ${routesCandidate}, skipping route loading.`);
         } catch (err) {
             console.error("[Sprint] Failed to load routes:", err);
         }
@@ -306,6 +346,40 @@ export class Sprint {
                             const fullRoute = this.prefix + (routePath === "/" ? "" : routePath);
                             const finalRoute = fullRoute || "/";
 
+                            // Register routes for OpenAPI.
+                            if (this.openapi.generateOnBuild) {
+                                if (!this.registeredRoutes) (this as any).registeredRoutes = [];
+
+                                for (const layer of router.stack) {
+                                    if (!layer.route) continue;
+
+                                    const route = layer.route;
+
+                                    for (const routeLayer of route.stack) {
+                                        // routeLayer.handle can be a single handler or an array of handlers
+                                        const handlers = Array.isArray(routeLayer.handle) ? routeLayer.handle : [routeLayer.handle];
+                                        
+                                        // Find the schema in the handlers (it's usually the first one)
+                                        for (const handler of handlers) {
+                                            const schema = (handler as any).__sprintRouteSchema;
+
+                                            if (schema) {
+                                                const method = (routeLayer.method || "").toUpperCase();
+
+                                                if (method) {
+                                                    (this as any).registeredRoutes.push({
+                                                        method,
+                                                        path: finalRoute + route.path,
+                                                        schema
+                                                    });
+                                                }
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             // Get matching middlewares for this route (match against path without prefix for middleware patterns).
                             const routeMiddlewares = this.getMiddlewaresForRoute(routePath);
 
@@ -384,6 +458,147 @@ export class Sprint {
         return this.prefix + (routePath.startsWith("/") ? routePath : "/" + routePath);
     };
 
+    private generateOpenAPISpec() {
+        const paths: any = {};
+
+        for (const route of this.registeredRoutes || []) {
+            const method = route.method.toLowerCase();
+
+            if (!paths[route.path]) paths[route.path] = {};
+
+            const routeSpec: any = {
+                summary: "Auto generated by Sprint",
+                responses: {
+                    "200": {
+                        description: "Success"
+                    }
+                }
+            };
+
+            // Add request body schema if defined (only for non-GET/HEAD/DELETE methods)
+            if (route.schema?.body && !["GET", "HEAD", "DELETE"].includes(route.method)) {
+                try {
+                    const bodySchema = this.zodSchemaToOpenAPI(route.schema.body);
+                    if (Object.keys(bodySchema).length > 0) {
+                        routeSpec.requestBody = {
+                            content: {
+                                "application/json": {
+                                    schema: bodySchema
+                                }
+                            }
+                        };
+                    }
+                } catch (e) {
+                    console.warn("[Sprint] Failed to convert body schema:", e);
+                }
+            }
+
+            // Add query params schema if defined
+            if (route.schema?.queryParams) {
+                try {
+                    const params = this.zodParamsToOpenAPI(route.schema.queryParams);
+                    if (params.length > 0) routeSpec.parameters = params;
+                } catch (e) {
+                    console.warn("[Sprint] Failed to convert query params schema:", e);
+                }
+            }
+
+            paths[route.path][method] = routeSpec;
+        }
+
+        return {
+            openapi: "3.0.0",
+            info: {
+                title: "Sprint API",
+                version: "1.0.0"
+            },
+            paths
+        };
+    };
+
+    private zodSchemaToOpenAPI(schema: any): any {
+        if (!schema) return {};
+        
+        // Handle ZodObject
+        if (schema._def?.typeName === "ZodObject" || schema.shape) {
+            const shape = schema.shape || schema._def?.shape();
+            if (!shape) return {};
+            
+            const properties: any = {};
+            const required: string[] = [];
+            
+            for (const [key, value] of Object.entries(shape)) {
+                const zodDef = (value as any)._def;
+                const typeName = zodDef?.typeName;
+                
+                let propSchema: any = {};
+                
+                if (typeName === "ZodString") {
+                    propSchema = { type: "string" };
+                } else if (typeName === "ZodNumber") {
+                    propSchema = { type: "number" };
+                } else if (typeName === "ZodBoolean") {
+                    propSchema = { type: "boolean" };
+                } else if (typeName === "ZodArray") {
+                    propSchema = { type: "array", items: this.zodSchemaToOpenAPI(zodDef?.type) };
+                } else if (typeName === "ZodObject") {
+                    propSchema = this.zodSchemaToOpenAPI(zodDef?.type);
+                } else if (typeName === "ZodOptional") {
+                    // Skip required check
+                    continue;
+                } else {
+                    propSchema = { type: "string" };
+                }
+                
+                properties[key] = propSchema;
+                
+                // Check if required (not optional)
+                if (!zodDef?.isOptional && typeName !== "ZodOptional") {
+                    required.push(key);
+                }
+            }
+            
+            return { type: "object", properties, required: required.length > 0 ? required : undefined };
+        }
+        
+        return {};
+    }
+
+    private zodParamsToOpenAPI(schema: any): any[] {
+        if (!schema) return [];
+        
+        const params: any[] = [];
+        const shape = schema.shape || schema._def?.shape();
+        
+        if (!shape) return [];
+        
+        for (const [key, value] of Object.entries(shape)) {
+            const zodDef = (value as any)._def;
+            const typeName = zodDef?.typeName;
+            
+            let paramSchema: any = {};
+            
+            if (typeName === "ZodString") {
+                paramSchema = { type: "string" };
+            } else if (typeName === "ZodNumber") {
+                paramSchema = { type: "number" };
+            } else if (typeName === "ZodBoolean") {
+                paramSchema = { type: "boolean" };
+            } else {
+                paramSchema = { type: "string" };
+            }
+            
+            params.push({
+                name: key,
+                in: "query",
+                required: !zodDef?.isOptional,
+                schema: paramSchema
+            });
+        }
+        
+        return params;
+    }
+
     // HTTP Methods (prefix is applied automatically).
     public get(path: string, handler: Handler) { return this.app.get(this.applyPrefix(path), handler); }
     public post(path: string, handler: Handler) { return this.app.post(this.applyPrefix(path), handler); }
@@ -428,6 +643,8 @@ public listen(callback?: () => void): void {
                 console.log(`   ${dim}Local:${reset}        http://localhost:${bold}${port}${reset}`);
                 console.log(`   ${dim}Prefix:${reset}       ${bold}${prefixInfo}${reset}`);
                 console.log(`   ${dim}Healthcheck:${reset}  http://localhost:${port}${this.prefix}/healthcheck`);
+                if (this.openapi.generateOnBuild) console.log(`   ${dim}OpenAPI Spec:${reset} http://localhost:${port}${this.prefix}/openapi.json`);    
+                if (this.openapi.swaggerUi.enabled) console.log(`   ${dim}Swagger UI:${reset}   http://localhost:${port}${this.prefix}/swagger`);
                 console.log("");
                 console.log(`   ${dim}Tip: Need stronger route protection? Learn more at${reset}`);
                 console.log(`   ${dim}https://docs.tpeoficial.com/docs/dymo-api/private/request-verifier${reset}`);

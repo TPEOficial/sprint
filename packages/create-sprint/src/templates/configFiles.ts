@@ -52,14 +52,17 @@ export default defineConfig({
 `;
 };
 
-export function getSprintConfigFile(language: string, telemetry: string) {
+export function getSprintConfigFile(language: string, telemetry: string, swagger: boolean) {
     if (language === "typescript") {
         let config = `import type { SprintOptions } from "sprint-es";
 
 export const config: SprintOptions = {
     openapi: {
-        /* Generate OpenAPI spec on build - Coming Soon */
-        generateOnBuild: false
+        enabled: ${swagger},
+        generateOnBuild: ${swagger},
+        swaggerUi: {
+            enabled: ${swagger}
+        }
     }
 };
 
@@ -93,8 +96,11 @@ initTelemetry({
 
     let config = `export const config = {
     openapi: {
-        /* Generate OpenAPI spec on build - Coming Soon */
-        generateOnBuild: false
+        enabled: ${swagger},
+        generateOnBuild: ${swagger},
+        swaggerUi: {
+            enabled: ${swagger}
+        }
     }
 };
 `;

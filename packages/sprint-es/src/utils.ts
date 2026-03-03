@@ -63,3 +63,14 @@ export function stripRouteGroups(routePath: string): string {
         .filter(segment => !(/^\(.+\)$/.test(segment)))
         .join("/") || "/";
 };
+
+export function deepMerge<T>(target: T, source: Partial<T>): T {
+    const output = { ...target } as any;
+
+    for (const key in source) {
+        if (typeof source[key] === "object" && source[key] !== null && !Array.isArray(source[key])) output[key] = deepMerge(output[key] ?? {}, source[key]);
+        else output[key] = source[key];
+    }
+
+    return output;
+};
