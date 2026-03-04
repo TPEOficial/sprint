@@ -95,7 +95,7 @@ jobs:
           echo "Waiting for GraphQL container..."
               
           for i in {1..30}; do
-            if curl -s http://localhost:5001/health; then
+            if curl -s http://localhost:5000/health; then
               echo "Health OK"
               exit 0
             fi
