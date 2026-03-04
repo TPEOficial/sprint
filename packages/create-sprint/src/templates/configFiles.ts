@@ -16,10 +16,7 @@ export function getTsConfig() {
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "types": [
-      "vitest/globals"
-    ]
+    "forceConsistentCasingInFileNames": true
   },
   "include": [
     "src/**/*"
