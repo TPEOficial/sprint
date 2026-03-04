@@ -1,7 +1,10 @@
 import { RequestHandler } from "express";
+import { z, normalizeHeadersSchema } from "./modules/schemas";
 import { MiddlewareConfig, AsyncRequestHandler, MiddlewareSchema } from "./types";
 
 function createSchemaValidationMiddleware(schema: MiddlewareSchema): RequestHandler {
+    const headersSchema = schema.headers ? normalizeHeadersSchema(schema.headers) : null;
+
     return (req, res, next) => {
         const errors: Array<{ location: string; path: string; message: string; }> = [];
         const method = req.method.toUpperCase();
@@ -40,10 +43,11 @@ function createSchemaValidationMiddleware(schema: MiddlewareSchema): RequestHand
             }
         }
 
-        if (schema.headers) {
-            const result = schema.headers.safeParse(req.headers);
+        if (headersSchema) {
+            const normalizedHeaders = Object.fromEntries(Object.entries(req.headers).map(([key, value]) => [key.toLowerCase(), value]));
+            const result = headersSchema.safeParse(normalizedHeaders);
             if (!result.success) {
-                errors.push(...result.error.issues.map(issue => ({
+                errors.push(...result.error.issues.map((issue: { path: (string | number)[]; message: string; }) => ({
                     location: "headers",
                     path: issue.path.join("."),
                     message: issue.message

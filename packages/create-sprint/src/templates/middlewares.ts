@@ -10,7 +10,13 @@ export default defineMiddleware({
     schema: {
         sprint: {
            authorization: z.sprint().authorization()
-        }
+        },
+        headers: z.object({
+            "X-Intranet-Origin": z.literal("https://domain.com", {
+                // This is an example of how to display a custom error message to avoid filtering values that should not be publicly known.
+                errorMap: () => ({ message: "Invalid intranet origin" })
+            })
+        })
     },
     handler: (req: SprintRequest, res: SprintResponse, next: NextFunction) => {
         const auth = req.sprint.authorization!;
@@ -34,7 +40,13 @@ export default defineMiddleware({
     schema: {
         sprint: {
            authorization: z.sprint().authorization()
-        }
+        },
+        headers: z.object({
+            "X-Intranet-Origin": z.literal("https://domain.com", {
+                // This is an example of how to display a custom error message to avoid filtering values that should not be publicly known.
+                errorMap: () => ({ message: "Invalid intranet origin" })
+            })
+        })
     },
     handler: (req, res, next) => {
         const auth = req.sprint.authorization!;

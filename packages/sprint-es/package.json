@@ -1,6 +1,6 @@
 {
     "name": "sprint-es",
-    "version": "0.0.147",
+    "version": "0.0.150",
     "description": "Sprint - Quickly API",
     "main": "dist/cjs/index.js",
     "module": "dist/esm/index.js",
