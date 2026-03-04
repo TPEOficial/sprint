@@ -2,54 +2,30 @@ export function getTsConfig() {
     return `
 {
   "compilerOptions": {
-    /* Target */
-    "ignoreDeprecations": "6.0",
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "lib": [
-      "ES2022"
-    ],
-    "types": [
-      "node"
-    ],
-    /* Output */
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    /* Strict */
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "exactOptionalPropertyTypes": true,
-    "noFallthroughCasesInSwitch": true,
-    /* Interop */
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    /* Performance */
-    "incremental": true,
-    "skipLibCheck": true,
-    "baseUrl": ".",
+    "target": "ESNext",
+    "module": "ESNext",
+    "baseUrl": "./src",
     "paths": {
       "@/*": [
-        "./src/*"
+        "*"
       ]
-    }
+    },
+    "moduleResolution": "Node",
+    "outDir": "dist",
+    "importsNotUsedAsValues": "remove",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": [
+      "vitest/globals"
+    ]
   },
   "include": [
     "src/**/*"
   ],
   "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.test.ts",
-    "**/*.spec.ts"
+    "node_modules"
   ]
 }
     `;
