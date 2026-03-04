@@ -121,7 +121,7 @@ export async function runCLI(args: string[]) {
         s2.start("Installing dependencies");
         try {
             await new Promise<void>((resolve, reject) => {
-                const child = spawn("npm", ["install"], {
+                const child = spawn("npm", ["install", "--include=dev"], {
                     cwd: targetDir,
                     stdio: "inherit",
                     shell: true

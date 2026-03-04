@@ -8,7 +8,7 @@ export type AuthorizationSource =
     | `query:${string}` 
     | `headers:${string}`;
 
-export interface SprintRequest extends Request {
+export type SprintRequest = Request & {
     sprint: {
         getAuthorization: (sources?: AuthorizationSource | AuthorizationSource[]) => string | undefined;
         authorization?: string;

@@ -47,8 +47,7 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
 };
 
 async function loadSprintConfig(): Promise<SprintConfig | null> {
-    const callerDir = process.cwd();
-    const projectRoot = await findProjectRoot(callerDir);
+    const projectRoot = await findProjectRoot(process.cwd());
 
     if (!projectRoot) return null;
 
@@ -126,9 +125,9 @@ export class Sprint {
         loadSprintConfig().then((config) => {
             const defaults: SprintOptions = {
                 port: process.env.PORT,
-                routesPath: "./src/routes",
-                middlewaresPath: "./src/middlewares",
-                cronjobsPath: "./src/cronjobs",
+                routesPath: isProd ? "./dist/routes" : "./src/routes",
+                middlewaresPath: isProd ? "./dist/middlewares" : "./src/middlewares",
+                cronjobsPath: isProd ? "./dist/cronjobs" : "./src/cronjobs",
                 jsonLimit: "50mb",
                 urlEncodedLimit: "50mb",
                 prefix: "",
@@ -270,16 +269,17 @@ export class Sprint {
     };
 
     private async init(): Promise<void> {
-        const callerDir = process.cwd();
+        const projectRoot = await findProjectRoot(process.cwd());
+        const baseDir = projectRoot ?? process.cwd();
 
         const normalizePath = (p: string) => {
             const clean = p.replace(/^\.\//, "");
             if (isProd) {
                 if (clean.startsWith("dist/")) return clean;
-                const callerDir = process.cwd();
-                const isTsProject = fs.existsSync(path.join(callerDir, "tsconfig.json")) || fs.existsSync(path.join(callerDir, "sprint.config.ts"));
-                if (isTsProject && clean.startsWith("src/")) return clean.replace("src/", "dist/");
-                if (isTsProject && !clean.includes("/")) return path.join("dist", clean);
+                // In production, if not already in dist, force it to dist.
+                if (clean.startsWith("src/")) return clean.replace("src/", "dist/");
+                // If it's a simple folder name, assume it lives inside dist.
+                if (!clean.includes("/")) return path.join("dist", clean);
             }
             return clean;
         };
@@ -288,7 +288,7 @@ export class Sprint {
         const routesCandidate = normalizePath(this.routesPath);
         const cronjobsCandidate = normalizePath(this.cronjobsPath);
 
-        const resolve = (p: string) => path.isAbsolute(p) ? p : path.join(callerDir, p);
+        const resolve = (p: string) => path.isAbsolute(p) ? p : path.join(baseDir, p);
 
         // Middlewares
         try {
