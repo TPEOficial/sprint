@@ -21,7 +21,7 @@ export interface CLIOptions {
 }
 
 export async function writeFile(path: string, content: string, options?: any) {
-    if (typeof content === "string") content = content.trimEnd();
+    if (typeof content === "string") content = content.trim();
     await fsWriteFile(path, content, options);
 };
 

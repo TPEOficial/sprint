@@ -22,6 +22,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/.env.production ./
 
 EXPOSE 5000
 
@@ -51,6 +52,8 @@ services:
     build: .
     ports:
       - "5000:5000"
+    env_file:
+      - .env.production
     environment:
       - NODE_ENV=production
       - PORT=5000
