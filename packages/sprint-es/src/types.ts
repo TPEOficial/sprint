@@ -1,17 +1,19 @@
 import { Request, Response, NextFunction, RequestHandler } from "express";
 import { ZodSchema } from "./modules/schemas/types";
 
-export type AsyncRequestHandler = (req: Request, res: Response, next: NextFunction) => Promise<any>;
-
-export type Handler = (req: Request, res: Response, next: NextFunction) => any;
+export type AsyncRequestHandler = (req: SprintRequest, res: SprintResponse, next: NextFunction) => Promise<any>;
+export type Handler = (req: SprintRequest, res: SprintResponse, next: NextFunction) => any;
 
 export type AuthorizationSource = 
     | `query:${string}` 
     | `headers:${string}`;
 
-export interface SprintRequest {
-    getAuthorization: (sources?: AuthorizationSource | AuthorizationSource[]) => string | undefined;
-    authorization?: string;
+export interface SprintRequest extends Request {
+    sprint: {
+        getAuthorization: (sources?: AuthorizationSource | AuthorizationSource[]) => string | undefined;
+        authorization?: string;
+    };
+    custom: any;
 }
 
 export type SprintResponse = Response;
@@ -19,8 +21,10 @@ export type SprintResponse = Response;
 declare global {
     namespace Express {
         interface Request {
-            sprint: SprintRequest;
-            /* Customized item where you can store anything you need during the request. */
+            sprint: {
+                getAuthorization: (sources?: AuthorizationSource | AuthorizationSource[]) => string | undefined;
+                authorization?: string;
+            };
             custom: any;
         }
     }

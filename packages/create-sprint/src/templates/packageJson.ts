@@ -16,15 +16,14 @@ export function generateJWTKeys(): JWTKeys {
 
 export function getTypeScriptPackageJson(name: string, telemetry: string, swagger: boolean, graphql: boolean) {
     const deps: Record<string, string> = {
-        "sprint-es": "^0.0.90"
+        "sprint-es": "^0.0.135"
     };
 
     const devDeps: Record<string, string> = {
         "@types/node": "^22.0.0",
         "tsx": "^4.19.0",
         typescript: "^5.6.0",
-        vite: "^6.4.1",
-        "vite-plugin-dts": "^4.5.4"
+        tsup: "^8.5.1"
     };
 
     if (telemetry === "sentry" || telemetry === "glitchtip") deps["@sentry/node"] = "^8.0.0";
@@ -43,7 +42,8 @@ export function getTypeScriptPackageJson(name: string, telemetry: string, swagge
         name: name === "." ? "sprint-app" : name,
         version: "0.0.1",
         description: "Sprint API",
-        main: "dist/index.js",
+        main: "dist/app.js",
+        type: "module",
         scripts: {
             build: "sprint-es build",
             start: "sprint-es start",
@@ -52,13 +52,28 @@ export function getTypeScriptPackageJson(name: string, telemetry: string, swagge
             "generate:keys": "sprint-es generate-keys"
         },
         dependencies: deps,
-        devDependencies: devDeps
+        devDependencies: devDeps,
+        tsup: {
+            entry: [
+                "src/**/*.ts"
+            ],
+            outDir: "dist",
+            format: [
+                "esm"
+            ],
+            target: "es2020",
+            sourcemap: true,
+            clean: true,
+            dts: true,
+            splitting: false,
+            skipNodeModulesBundle: true
+        }
     };
 };
 
 export function getJavaScriptPackageJson(name: string, telemetry: string, swagger: boolean, graphql: boolean) {
     const deps: Record<string, string> = {
-        "sprint-es": "^0.0.90"
+        "sprint-es": "^0.0.135"
     };
 
     if (telemetry === "sentry" || telemetry === "glitchtip") deps["@sentry/node"] = "^8.0.0";
@@ -76,7 +91,7 @@ export function getJavaScriptPackageJson(name: string, telemetry: string, swagge
         name: name === "." ? "sprint-app" : name,
         version: "0.0.1",
         description: "Sprint API",
-        main: "src/index.js",
+        main: "src/app.js",
         type: "module",
         scripts: {
             build: "sprint-es build",

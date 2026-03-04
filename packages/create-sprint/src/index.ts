@@ -5,12 +5,14 @@ import { join } from "path";
 import color from "picocolors";
 import * as p from "@clack/prompts";
 import { validateProjectName } from "./validators.js";
-import { getTypeScriptPackageJson, getJavaScriptPackageJson, getTsConfig, getViteConfig, getMainFile, getHomeRoute, getAdminRoute, getHomeController, getAdminController, getEnvExample, getInternalAuthMiddleware, getUserAuthMiddleware, getHomeSchema, getAdminSchema, getDockerfile, getDockerCompose, getGitignore, getDockerIgnore, getSprintConfigFile, getEnvDevelopment, getEnvProduction, getExampleCronJob, getGraphQLFiles } from "./generators.js";
+import { getTypeScriptPackageJson, getJavaScriptPackageJson, getTsConfig, getMainFile, getHomeRoute, getAdminRoute, getHomeController, getAdminController, getEnvExample, getInternalAuthMiddleware, getUserAuthMiddleware, getHomeSchema, getAdminSchema, getDockerfile, getDockerCompose, getGitignore, getDockerIgnore, getSprintConfigFile, getEnvDevelopment, getEnvProduction, getExampleCronJob, getGraphQLFiles } from "./generators.js";
+
+type TelemetryProviders =  "none" | "sentry" | "glitchtip" | "discord" | "open-telemetry" | "telegram" | "nodemailer";
 
 export interface CLIOptions {
     projectName?: string;
     language?: "typescript" | "javascript";
-    telemetry?: "none" | "sentry" | "glitchtip" | "discord";
+    telemetry?: TelemetryProviders;
     swagger?: boolean;
     graphql?: boolean;
     docker?: boolean;
@@ -33,7 +35,7 @@ export async function runCLI(args: string[]) {
     let config: {
         projectName: string;
         language: "typescript" | "javascript";
-        telemetry: string;
+        telemetry: TelemetryProviders;
         swagger: boolean;
         graphql: boolean;
         docker: boolean;
@@ -43,7 +45,7 @@ export async function runCLI(args: string[]) {
         config = {
             projectName: options.projectName || "sprint-app",
             language: options.language || "typescript",
-            telemetry: options.telemetry || "none",
+            telemetry: options.telemetry ?? "none",
             swagger: options.swagger ?? true,
             graphql: options.graphql ?? false,
             docker: options.docker || false,
@@ -55,7 +57,7 @@ export async function runCLI(args: string[]) {
                     p.text({
                         message: "Project name:",
                         placeholder: "my-api",
-                        validate: (v) => validateProjectName(v) || undefined,
+                        validate: (v) => validateProjectName(v || "sprint-app") || undefined,
                     }),
 
                 language: () =>
@@ -167,7 +169,10 @@ function parseArgs(args: string[]): CLIOptions {
         else if (hasJs) options.language = "javascript";
     } else options.language = "typescript";
     
-    if (hasName !== -1 && args[hasName + 1]) options.projectName = args[hasName + 1];
+    if (hasName !== -1) {
+        const value = args[hasName + 1];
+        if (typeof value === "string") options.projectName = value;
+    }
 
     if (args.includes("--current")) options.projectName = ".";
 
@@ -181,7 +186,9 @@ function parseArgs(args: string[]): CLIOptions {
     
     if (args.includes("--no-install")) options.skipInstall = true;
 
-    if (telemetryArg && ["sentry", "glitchtip", "discord", "none"].includes(telemetryArg)) options.telemetry = telemetryArg as CLIOptions["telemetry"];
+    if (telemetryArg && ["sentry", "glitchtip", "discord", "none"].includes(telemetryArg)) {
+        if (typeof telemetryArg === "string" && ["sentry", "glitchtip", "discord", "none"].includes(telemetryArg)) options.telemetry = telemetryArg as TelemetryProviders;
+    }
     
     return options;
 };
@@ -189,7 +196,7 @@ function parseArgs(args: string[]): CLIOptions {
 async function createProject(
     projectName: string,
     language: "typescript" | "javascript",
-    telemetry: string,
+    telemetry: TelemetryProviders,
     swagger: boolean,
     graphql: boolean,
     useDocker: boolean
@@ -212,7 +219,6 @@ async function createProject(
 
     if (language === "typescript") {
         await writeFile(join(targetDir, "tsconfig.json"), getTsConfig());
-        await writeFile(join(targetDir, "vite.config.ts"), getViteConfig());
         await writeFile(join(targetDir, "sprint.config.ts"), getSprintConfigFile(language, telemetry, swagger, graphql));
     } else await writeFile(join(targetDir, "sprint.config.js"), getSprintConfigFile(language, telemetry, swagger, graphql));
     

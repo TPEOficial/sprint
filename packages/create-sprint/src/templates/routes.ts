@@ -1,6 +1,5 @@
 export function getMainFile(language: string, graphql: boolean = false) {
     const isTs = language === "typescript";
-    const ext = isTs ? "" : ".js";
     
     if (isTs) {
         if (graphql) {

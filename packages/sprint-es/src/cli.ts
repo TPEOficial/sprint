@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
-import { existsSync, readdirSync, statSync, readFileSync } from "fs";
+import { existsSync, readdirSync, statSync, readFileSync, writeFileSync, rmSync } from "fs";
 import * as crypto from "crypto";
 import { resolve, join } from "path";
 import { spawn } from "child_process";
+import { createRequire } from "module";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -24,6 +25,135 @@ const logger = {
     success: (...args: string[]) => console.log(pc.green(args.join(" "))),
     dim: (...args: string[]) => console.log(pc.dim(args.join(" "))),
     break: () => console.log(""),
+};
+
+const singleComment = Symbol("singleComment");
+const multiComment = Symbol("multiComment");
+
+type CommentState = false | typeof singleComment | typeof multiComment;
+
+const stripWithoutWhitespace = () => "";
+
+const stripWithWhitespace = (
+    string: string,
+    start: number,
+    end: number
+) => string.slice(start, end).replace(/[^ \t\r\n]/g, " ");
+
+const isEscaped = (jsonString: string, quotePosition: number) => {
+    let index = quotePosition - 1;
+    let backslashCount = 0;
+
+    while (jsonString[index] === "\\") {
+        index -= 1;
+        backslashCount += 1;
+    }
+
+    return Boolean(backslashCount % 2);
+};
+
+export default function stripJsonComments(
+    jsonString: string,
+    { whitespace = true, trailingCommas = false } = {}
+) {
+    if (typeof jsonString !== "string")
+        throw new TypeError(
+            `Expected argument \`jsonString\` to be a \`string\`, got \`${typeof jsonString}\``
+        );
+
+    const strip = whitespace ? stripWithWhitespace : stripWithoutWhitespace;
+
+    let isInsideString = false;
+    let isInsideComment: CommentState = false;
+    let offset = 0;
+    let buffer = "";
+    let result = "";
+    let commaIndex = -1;
+
+    for (let index = 0; index < jsonString.length; index++) {
+        const currentCharacter = jsonString[index];
+        const nextCharacter = jsonString[index + 1];
+
+        if (!isInsideComment && currentCharacter === '"') {
+            const escaped = isEscaped(jsonString, index);
+            if (!escaped) {
+                isInsideString = !isInsideString;
+            }
+        }
+
+        if (isInsideString) {
+            continue;
+        }
+
+        if (!isInsideComment && currentCharacter + nextCharacter === "//") {
+            buffer += jsonString.slice(offset, index);
+            offset = index;
+            isInsideComment = singleComment;
+            index++;
+        } else if (
+            isInsideComment === singleComment &&
+            currentCharacter + nextCharacter === "\r\n"
+        ) {
+            index++;
+            isInsideComment = false;
+            buffer += strip(jsonString, offset, index);
+            offset = index;
+            continue;
+        } else if (
+            isInsideComment === singleComment &&
+            currentCharacter === "\n"
+        ) {
+            isInsideComment = false;
+            buffer += strip(jsonString, offset, index);
+            offset = index;
+        } else if (
+            !isInsideComment &&
+            currentCharacter + nextCharacter === "/*"
+        ) {
+            buffer += jsonString.slice(offset, index);
+            offset = index;
+            isInsideComment = multiComment;
+            index++;
+            continue;
+        } else if (
+            isInsideComment === multiComment &&
+            currentCharacter + nextCharacter === "*/"
+        ) {
+            index++;
+            isInsideComment = false;
+            buffer += strip(jsonString, offset, index + 1);
+            offset = index + 1;
+            continue;
+        } else if (trailingCommas && !isInsideComment) {
+            if (commaIndex !== -1) {
+                if (currentCharacter === "}" || currentCharacter === "]") {
+                    buffer += jsonString.slice(offset, index);
+                    result += strip(buffer, 0, 1) + buffer.slice(1);
+                    buffer = "";
+                    offset = index;
+                    commaIndex = -1;
+                } else if (
+                    currentCharacter !== " " &&
+                    currentCharacter !== "\t" &&
+                    currentCharacter !== "\r" &&
+                    currentCharacter !== "\n"
+                ) {
+                    buffer += jsonString.slice(offset, index);
+                    offset = index;
+                    commaIndex = -1;
+                }
+            } else if (currentCharacter === ",") {
+                result += buffer + jsonString.slice(offset, index);
+                buffer = "";
+                offset = index;
+                commaIndex = index;
+            }
+        }
+    }
+
+    const remaining = isInsideComment === singleComment ? strip(jsonString, offset, jsonString.length) : jsonString.slice(offset);
+
+    return result + buffer + remaining;
 };
 
 if (!command) {
@@ -63,16 +193,19 @@ function getProjectRoot() {
 
 const projectRoot = getProjectRoot();
 
-function runCommand(cmd: string, envVars: Record<string, string>) {
-    const child = spawn(cmd, args.slice(1), {
-        cwd: projectRoot,
-        stdio: "inherit",
-        shell: true,
-        env: { ...process.env, ...envVars }
-    });
+function runCommand(cmd: string, envVars: Record<string, string>): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const child = spawn(cmd, [], {
+            cwd: projectRoot,
+            stdio: "inherit",
+            shell: true,
+            env: { ...process.env, ...envVars }
+        });
 
-    child.on("exit", (code: number | null) => {
-        process.exit(code || 0);
+        child.on("exit", (code: number | null) => {
+            if (code === 0 || code === null) resolve();
+            else reject(new Error(`Command failed with exit code ${code}`));
+        });
     });
 };
 
@@ -117,35 +250,35 @@ interface MiddlewareInfo {
 
 function scanDirectory(dir: string, extensions: string[]): string[] {
     const files: string[] = [];
-    
+
     if (!existsSync(dir)) return files;
-    
+
     const entries = readdirSync(dir);
     for (const entry of entries) {
         const fullPath = join(dir, entry);
         const stat = statSync(fullPath);
-        
+
         if (stat.isDirectory()) {
             files.push(...scanDirectory(fullPath, extensions));
         } else if (stat.isFile() && extensions.some(ext => entry.endsWith(ext))) {
             files.push(fullPath);
         }
     }
-    
+
     return files;
 }
 
 function hasSchemaInRouterFile(filePath: string): boolean {
     try {
         const content = readFileSync(filePath, "utf-8");
-        
+
         if (content.includes("defineRouteSchema") || content.includes("__sprintRouteSchema")) return true;
-        
+
         const routerMethodPattern = /(router|get|post|put|delete|patch)\s*\.\s*(get|post|put|delete|patch|all)\s*\(\s*['"`]/;
         const schemaImportPattern = /import\s+.*\s+from\s+['"]@\/schemas\/|import\s+.*\s+from\s+['"]\.\/schemas\//;
-        
+
         if (routerMethodPattern.test(content) && schemaImportPattern.test(content)) return true;
-        
+
         return false;
     } catch {
         return false;
@@ -154,24 +287,24 @@ function hasSchemaInRouterFile(filePath: string): boolean {
 
 function extractRoutesFromFile(filePath: string, schemaNames: Set<string>): RouteInfo[] {
     const routes: RouteInfo[] = [];
-    
+
     try {
         const content = readFileSync(filePath, "utf-8");
         const lines = content.split("\n");
-        
+
         const routerMethods = ["get", "post", "put", "delete", "patch", "all", "head", "options"];
-        
+
         for (const line of lines) {
             const trimmed = line.trim();
-            
+
             for (const method of routerMethods) {
                 const match = trimmed.match(new RegExp(`router\\.${method}\\s*\\(\\s*['"\`]([^'"\`]+)['"\`]\\s*,\\s*([^,)]+)`));
                 if (match) {
                     const routePath = match[1];
                     const firstArg = match[2].trim().split(',')[0].trim();
-                    
+
                     const hasSchema = schemaNames.has(firstArg);
-                    
+
                     routes.push({
                         file: filePath,
                         path: routePath,
@@ -185,20 +318,20 @@ function extractRoutesFromFile(filePath: string, schemaNames: Set<string>): Rout
     } catch (e) {
         console.error("Error extracting routes:", e);
     }
-    
+
     return routes;
 }
 
 function extractAllSchemaNames(projectRoot: string): Set<string> {
     const schemaNames = new Set<string>();
     const schemasPath = join(projectRoot, "src/schemas");
-    
+
     if (!existsSync(schemasPath)) {
         return schemaNames;
     }
-    
+
     const schemaFiles = scanDirectory(schemasPath, [".ts", ".js"]);
-    
+
     for (const file of schemaFiles) {
         try {
             const content = readFileSync(file, "utf-8");
@@ -210,22 +343,18 @@ function extractAllSchemaNames(projectRoot: string): Set<string> {
             // Ignore
         }
     }
-    
-    return schemaNames;
-}
 
-function checkRouteHasSchema(filePath: string, routePath: string, method: string): boolean {
-    return false;
+    return schemaNames;
 }
 
 function hasSchemaInMiddleware(filePath: string): boolean {
     try {
         const content = readFileSync(filePath, "utf-8");
-        
+
         if (content.includes("schema:") || content.includes("__sprintMiddlewareSchema")) {
             return true;
         }
-        
+
         return false;
     } catch {
         return false;
@@ -235,12 +364,12 @@ function hasSchemaInMiddleware(filePath: string): boolean {
 function extractMiddlewareName(filePath: string): string {
     try {
         const content = readFileSync(filePath, "utf-8");
-        
+
         const nameMatch = content.match(/name:\s*['"]([^'"]+)['"]/);
         if (nameMatch) {
             return nameMatch[1];
         }
-        
+
         const fileName = filePath.split(/[/\\]/).pop() || filePath;
         return fileName.replace(/\.(ts|js)$/, "");
     } catch {
@@ -250,45 +379,45 @@ function extractMiddlewareName(filePath: string): string {
 
 function renderFramedBox(lines: string[], title?: string): void {
     if (lines.length === 0) return;
-    
+
     const maxLength = Math.max(...lines.map(line => line.length));
     const horizontalPadding = 1;
     const borderLine = "─".repeat(maxLength + horizontalPadding * 2);
-    
+
     console.log(pc.dim(`┌${borderLine}┐`));
-    
+
     if (title) {
         const titlePadding = " ".repeat(maxLength - title.length + horizontalPadding * 2);
         console.log(pc.dim("│") + " " + pc.bold(pc.cyan(title)) + titlePadding + pc.dim("│"));
         console.log(pc.dim(`├${borderLine}┤`));
     }
-    
+
     for (const line of lines) {
         const padding = " ".repeat(maxLength - line.length + horizontalPadding * 2);
         console.log(pc.dim("│") + " " + line + padding + pc.dim("│"));
     }
-    
+
     console.log(pc.dim(`└${borderLine}┘`));
 }
 
 async function runDoctor() {
     logger.break();
     logger.info("🔍 Sprint Doctor - Analyzing routes and middlewares...\n");
-    
+
     const routesPath = join(projectRoot, "src/routes");
     const middlewaresPath = join(projectRoot, "src/middlewares");
-    
+
     const schemaNames = extractAllSchemaNames(projectRoot);
-    
+
     const routeFiles = scanDirectory(routesPath, [".ts", ".js"]);
     const middlewareFiles = scanDirectory(middlewaresPath, [".ts", ".js"]);
-    
+
     const allRoutes: RouteInfo[] = [];
     for (const file of routeFiles) {
         const routes = extractRoutesFromFile(file, schemaNames);
         allRoutes.push(...routes);
     }
-    
+
     const middlewares: MiddlewareInfo[] = [];
     for (const file of middlewareFiles) {
         middlewares.push({
@@ -297,16 +426,16 @@ async function runDoctor() {
             hasSchema: hasSchemaInMiddleware(file)
         });
     }
-    
+
     const routesWithoutSchema = allRoutes.filter(r => !r.hasSchema);
     const middlewaresWithoutSchema = middlewares.filter(m => !m.hasSchema);
-    
+
     const routesWithSchema = allRoutes.filter(r => r.hasSchema);
     const middlewaresWithSchema = middlewares.filter(m => m.hasSchema);
-    
+
     logger.break();
     console.log(pc.bold("📊 Schema Coverage Report\n"));
-    
+
     const routesLines = [
         `${pc.green("✓")} Routes with schema: ${routesWithSchema.length}`,
         `${routesWithoutSchema.length > 0 ? pc.red("✗") : pc.green("✓")} Routes without schema: ${routesWithoutSchema.length}`,
@@ -314,9 +443,9 @@ async function runDoctor() {
         `Total routes: ${allRoutes.length}`,
     ];
     renderFramedBox(routesLines, "Routes");
-    
+
     logger.break();
-    
+
     const middlewareLines = [
         `${pc.green("✓")} Middlewares with schema: ${middlewaresWithSchema.length}`,
         `${middlewaresWithoutSchema.length > 0 ? pc.red("✗") : pc.green("✓")} Middlewares without schema: ${middlewaresWithoutSchema.length}`,
@@ -324,55 +453,55 @@ async function runDoctor() {
         `Total middlewares: ${middlewares.length}`,
     ];
     renderFramedBox(middlewareLines, "Middlewares");
-    
+
     logger.break();
-    
+
     if (routesWithoutSchema.length > 0) {
         console.log(pc.bold(pc.yellow("⚠️  Routes without schema:")));
         logger.break();
-        
+
         const uniqueRoutes = routesWithoutSchema.reduce((acc, route) => {
             const key = `${route.method}:${route.path}`;
             if (!acc[key]) acc[key] = { ...route, files: [route.file] };
             else if (!acc[key].files.includes(route.file)) acc[key].files.push(route.file);
             return acc;
         }, {} as Record<string, RouteInfo & { files: string[] }>);
-        
+
         for (const route of Object.values(uniqueRoutes)) {
             const fileName = route.file.split(/[/\\]/).pop();
             console.log(`  ${pc.red("✗")} ${pc.bold(route.method)} ${route.path}`);
             console.log(`    ${pc.dim("File:")} ${fileName}`);
         }
-        
+
         logger.break();
     }
-    
+
     if (middlewaresWithoutSchema.length > 0) {
         console.log(pc.bold(pc.yellow("⚠️  Middlewares without schema:")));
         logger.break();
-        
+
         for (const mw of middlewaresWithoutSchema) {
             const fileName = mw.file.split(/[/\\]/).pop();
             console.log(`  ${pc.red("✗")} ${pc.bold(mw.name)}`);
             console.log(`    ${pc.dim("File:")} ${fileName}`);
         }
-        
+
         logger.break();
     }
-    
+
     if (routesWithoutSchema.length === 0 && middlewaresWithoutSchema.length === 0) {
         console.log(pc.green(pc.bold("✅ All routes and middlewares have schemas defined!")));
         logger.break();
     }
-    
+
     const totalWithoutSchema = routesWithoutSchema.length + middlewaresWithoutSchema.length;
     const totalItems = allRoutes.length + middlewares.length;
-    
+
     if (totalItems > 0) {
         const coverage = Math.round(((totalItems - totalWithoutSchema) / totalItems) * 100);
-        
+
         console.log(pc.bold("📈 Schema Coverage: ") + (coverage >= 80 ? pc.green(`${coverage}%`) : coverage >= 50 ? pc.yellow(`${coverage}%`) : pc.red(`${coverage}%`)));
-        
+
         if (coverage < 80) {
             logger.break();
             console.log(pc.yellow("💡 Tip: Adding schemas helps with:"));
@@ -382,51 +511,116 @@ async function runDoctor() {
             console.log(pc.dim("  • Auto-completion in IDEs"));
         }
     }
-    
+
     logger.break();
 };
 
-switch (command) {
-    case "dev":
-        console.log("🚀 Starting development server with hot reload...");
-        const srcFile = existsSync(join(projectRoot, "src/app.ts")) ? "src/app.ts" 
-            : existsSync(join(projectRoot, "src/app.js")) ? "src/app.js"
-            : existsSync(join(projectRoot, "src/index.ts")) ? "src/index.ts"
-            : "src/index.js";
-        runCommand(`tsx --watch ${srcFile}`, { NODE_ENV: "development" });
-        break;
-    case "build":
-        console.log("🚀 Building for production...");
-        const hasViteConfig = existsSync(join(projectRoot, "vite.config.ts")) || existsSync(join(projectRoot, "vite.config.js"));
-        if (hasViteConfig) runCommand("vite build", { NODE_ENV: "production" });
-        else {
-            console.error("❌ Error: no vite config found.");
-            process.exit(1);
+async function main() {
+    switch (command) {
+        case "dev": {
+            console.log("🚀 Starting development server with hot reload...");
+            const isTS = existsSync(join(projectRoot, "sprint.config.ts"));
+            const srcFile = isTS
+                ? existsSync(join(projectRoot, "src/app.ts")) ? "src/app.ts" : "src/index.ts"
+                : existsSync(join(projectRoot, "src/app.js")) ? "src/app.js" : "src/index.js";
+            const devCmd = isTS
+                ? `tsx --watch ${srcFile}`
+                : `node --watch ${srcFile}`;
+            await runCommand(devCmd, { NODE_ENV: "development" });
+            break;
         }
-        break;
-    case "start":
-        console.log("🚀 Starting production server...");
-        runCommand("node dist/app.js", { NODE_ENV: "production" });
-        break;
-    case "doctor":
-        runDoctor();
-        break;
-    case "generate-keys":
-        const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", {
-            modulusLength: 2048,
-            publicKeyEncoding: { type: "spki", format: "pem" },
-            privateKeyEncoding: { type: "pkcs8", format: "pem" }
-        });
+        case "build": {
+            console.log("🚀 Building for production...");
+            const isTS = existsSync(join(projectRoot, "sprint.config.ts"));
+            const distPath = join(projectRoot, "dist");
+            const tsconfigPath = join(projectRoot, "tsconfig.json");
 
-        console.log("\n🔑 Generating JWT keys...\n");
-        console.log("JWT_PUBLIC_KEY='" + publicKey + "'");
-        console.log("\nJWT_PRIVATE_KEY='" + privateKey + "'");
-        console.log("\nJWT_ENCRYPTION_SECRET=" + generateJWTSecret());
-        console.log("\n📝 Add these to your .env file (use single quotes for multiline values):\n");
-        process.exit(0);
-        break;
-    default:
-        console.error(`Unknown command: ${command}`);
-        console.log("Use --help for usage information");
-        process.exit(1);
-}
+            console.log("[Sprint] Cleaning dist...");
+            rmSync(distPath, { recursive: true, force: true });
+            console.log("[Sprint] dist cleaned ✓");
+
+            console.log("[Sprint] Compiling with tsup...");
+
+            await runCommand(
+                `tsc && tsup`,
+                { NODE_ENV: "production" }
+            );
+            console.log("[Sprint] Compilation completed ✓");
+
+            if (isTS) {
+                console.log("[Sprint] Compiling sprint.config.ts...");
+                await runCommand(
+                    `tsup sprint.config.ts --outDir "${distPath}" --format cjs --tsconfig "${tsconfigPath}" --clean false`,
+                    { NODE_ENV: "production" }
+                );
+                console.log("[Sprint] sprint.config.js generated ✓");
+            }
+
+            console.log("✅ Build completed successfully!");
+            break;
+        }
+        case "start": {
+            console.log("🚀 Starting production server...");
+            const isTS = existsSync(join(projectRoot, "sprint.config.ts"));
+
+            let entryFile: string | null = null;
+
+            if (isTS) {
+                const candidates = [
+                    "dist/app.mjs",
+                    "dist/app.js",
+                    "dist/index.mjs",
+                    "dist/index.js",
+                ];
+                entryFile = candidates.find(f => existsSync(join(projectRoot, f))) ?? null;
+            } else {
+                const candidates = [
+                    "src/app.js",
+                    "src/app.mjs",
+                    "src/index.js",
+                    "src/index.mjs",
+                ];
+                entryFile = candidates.find(f => existsSync(join(projectRoot, f))) ?? null;
+            }
+
+            if (!entryFile) {
+                console.error(`[Sprint] Entry file not found.`);
+                console.error(isTS
+                    ? "[Sprint] Did you run 'sprint-es build' first? Expected dist/app.mjs or dist/index.mjs"
+                    : "[Sprint] Expected src/app.js or src/index.js"
+                );
+                process.exit(1);
+            }
+
+            await runCommand(`node "${join(projectRoot, entryFile)}"`, { NODE_ENV: "production" });
+            break;
+        }
+        case "doctor":
+            runDoctor();
+            break;
+        case "generate-keys": {
+            const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", {
+                modulusLength: 2048,
+                publicKeyEncoding: { type: "spki", format: "pem" },
+                privateKeyEncoding: { type: "pkcs8", format: "pem" }
+            });
+
+            console.log("\n🔑 Generating JWT keys...\n");
+            console.log("JWT_PUBLIC_KEY='" + publicKey + "'");
+            console.log("\nJWT_PRIVATE_KEY='" + privateKey + "'");
+            console.log("\nJWT_ENCRYPTION_SECRET=" + generateJWTSecret());
+            console.log("\n📝 Add these to your .env file (use single quotes for multiline values):\n");
+            process.exit(0);
+            break;
+        }
+        default:
+            console.error(`Unknown command: ${command}`);
+            console.log("Use --help for usage information");
+            process.exit(1);
+    }
+};
+
+main().then(() => process.exit(0)).catch((err) => {
+    console.error(err);
+    process.exit(1);
+});

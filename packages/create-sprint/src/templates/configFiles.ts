@@ -1,55 +1,58 @@
 export function getTsConfig() {
-    return JSON.stringify({
-        compilerOptions: {
-            target: "ES2022",
-            module: "NodeNext",
-            moduleResolution: "NodeNext",
-            lib: ["ES2022"],
-            types: ["node"],
-            outDir: "./dist",
-            rootDir: "./src",
-            strict: true,
-            esModuleInterop: true,
-            skipLibCheck: true,
-            forceConsistentCasingInFileNames: true,
-            resolveJsonModule: true,
-            declaration: true,
-            declarationMap: true,
-            sourceMap: true,
-            baseUrl: ".",
-            paths: {
-                "@/*": ["./src/*"]
-            }
-        },
-        include: ["src/**/*"],
-        exclude: ["node_modules", "dist"],
-    }, null, 2);
-};
-
-export function getViteConfig() {
-    return `import { defineConfig } from "vite";
-import { resolve } from "path";
-
-export default defineConfig({
-    build: {
-        lib: {
-            entry: "src/app.ts",
-            formats: ["es"],
-            fileName: "app"
-        },
-        outDir: "dist",
-        rollupOptions: {
-            external: ["sprint-es", "express", "cors", "morgan", "serve-favicon", "dotenv"]
-        },
-        target: "ES2020"
-    },
-    resolve: {
-        alias: {
-            "@": "src"
-        }
+    return `
+{
+  "compilerOptions": {
+    /* Target */
+    "ignoreDeprecations": "6.0",
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "node"
+    ],
+    /* Output */
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    /* Strict */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true,
+    /* Interop */
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    /* Performance */
+    "incremental": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
     }
-});
-`;
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+}
+    `;
 };
 
 export function getSprintConfigFile(language: string, telemetry: string, swagger: boolean, graphql: boolean) {

@@ -1,8 +1,8 @@
 // Package JSON
 export { generateJWTKeys, getTypeScriptPackageJson, getJavaScriptPackageJson } from "./packageJson.js";
 
-// Config Files (tsconfig, vite.config, sprint.config)
-export { getTsConfig, getViteConfig, getSprintConfigFile } from "./configFiles.js";
+// Config Files (tsconfig, sprint.config)
+export { getTsConfig, getSprintConfigFile } from "./configFiles.js";
 
 // Environment Files
 export { getEnvExample, getEnvDevelopment, getEnvProduction } from "./env.js";

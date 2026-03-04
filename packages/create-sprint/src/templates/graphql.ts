@@ -1,6 +1,5 @@
 export function getGraphQLFiles(language: string) {
     const isTs = language === "typescript";
-    const ext = isTs ? "" : ".js";
     
     const tsTypes = `import { GraphQLObjectType, GraphQLString, GraphQLList, GraphQLNonNull } from "graphql";
 

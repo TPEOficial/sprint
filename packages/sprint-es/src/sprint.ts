@@ -52,20 +52,16 @@ async function loadSprintConfig(): Promise<SprintConfig | null> {
 
     if (!projectRoot) return null;
 
-    const configFiles = ["sprint.config.ts", "sprint.config.js"];
+    const configFiles = isProd ? ["dist/sprint.config.js", "sprint.config.js", "dist/sprint.config.mjs"] : ["sprint.config.ts", "sprint.config.js"];
 
     for (const configFile of configFiles) {
         const configPath = path.join(projectRoot, configFile);
-
         if (!fs.existsSync(configPath)) continue;
 
         try {
             const moduleUrl = pathToFileURL(configPath).href;
             const module = await import(moduleUrl);
-
-            // Support multiple export styles.
             return module.default ?? module.config ?? module ?? null;
-
         } catch (err) {
             console.warn(`[Sprint] Failed to load config from ${configPath}:`, err);
         }
@@ -86,6 +82,7 @@ export class Sprint {
     private routesLoaded!: Promise<void>;
     private server!: http.Server;
     private loadedMiddlewares: LoadedMiddleware[] = [];
+    private counters = { routes: 0, middlewares: 0, cronjobs: 0 };
     private openapi: {
         generateOnBuild: boolean;
         path: string;
@@ -93,14 +90,14 @@ export class Sprint {
             enabled: boolean;
             path: string;
         };
-    } = { 
-        generateOnBuild: false,
-        path: "/openapi.json",
-        swaggerUi: {
-            enabled: false,
-            path: "/swagger"
-        }
-    };
+    } = {
+            generateOnBuild: false,
+            path: "/openapi.json",
+            swaggerUi: {
+                enabled: false,
+                path: "/swagger"
+            }
+        };
     private graphql: {
         enabled: boolean;
         path: string;
@@ -109,13 +106,13 @@ export class Sprint {
             path: string;
         };
     } = {
-        enabled: false,
-        path: "/graphql",
-        graphiql: {
             enabled: false,
-            path: "/grapiql"
-        }
-    };
+            path: "/graphql",
+            graphiql: {
+                enabled: false,
+                path: "/graphiql"
+            }
+        };
     private graphqlSchema: any = null;
     private registeredRoutes: Array<{
         method: string;
@@ -125,7 +122,7 @@ export class Sprint {
 
     constructor() {
         this.app = express();
-        
+
         loadSprintConfig().then((config) => {
             const defaults: SprintOptions = {
                 port: process.env.PORT,
@@ -237,7 +234,7 @@ export class Sprint {
                     try {
                         const { createHandler } = await import("graphql-http/lib/use/express");
                         const { ruruHTML } = await import("ruru/server");
-                        
+
                         this.app.all(this.graphql.path, createHandler({
                             schema: this.graphqlSchema
                         }));
@@ -256,7 +253,7 @@ export class Sprint {
                                 res.type("html");
                                 res.end(ruruHTML({ endpoint: this.graphql.path }).replace(/<title>.*?<\/title>/, "<title>Sprint GraphQL IDE</title>"));
                             });
-                            
+
                             if (isVerbose) console.log(`[Sprint] GraphiQL IDE: http://localhost:${this.port}${this.graphql.graphiql.path}`);
                         }
 
@@ -266,6 +263,7 @@ export class Sprint {
                     }
                 }
 
+                this.loadNotFound();
                 if (finalConfig.autoListen) this.listen();
             });
         });
@@ -274,28 +272,47 @@ export class Sprint {
     private async init(): Promise<void> {
         const callerDir = process.cwd();
 
-        // Load middlewares first.
+        const normalizePath = (p: string) => {
+            const clean = p.replace(/^\.\//, "");
+            if (isProd) {
+                if (clean.startsWith("dist/")) return clean;
+                const callerDir = process.cwd();
+                const isTsProject = fs.existsSync(path.join(callerDir, "tsconfig.json")) || fs.existsSync(path.join(callerDir, "sprint.config.ts"));
+                if (isTsProject && clean.startsWith("src/")) return clean.replace("src/", "dist/");
+                if (isTsProject && !clean.includes("/")) return path.join("dist", clean);
+            }
+            return clean;
+        };
+
+        const middlewaresCandidate = normalizePath(this.middlewaresPath);
+        const routesCandidate = normalizePath(this.routesPath);
+        const cronjobsCandidate = normalizePath(this.cronjobsPath);
+
+        const resolve = (p: string) => path.isAbsolute(p) ? p : path.join(callerDir, p);
+
+        // Middlewares
         try {
-            const middlewaresCandidate = path.isAbsolute(this.middlewaresPath) ? this.middlewaresPath : path.join(callerDir, this.middlewaresPath);
-            if (fs.existsSync(middlewaresCandidate) && fs.statSync(middlewaresCandidate).isDirectory()) await this.loadMiddlewares(middlewaresCandidate);
-            else if (isVerbose) console.log(`[Sprint] Middlewares folder not found at: ${middlewaresCandidate}, skipping.`);
+            const fullPath = resolve(middlewaresCandidate);
+            if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) await this.loadMiddlewares(fullPath);
+            else if (isVerbose) console.log(`[Sprint] Middlewares folder not found at: ${fullPath}, skipping.`);
         } catch (err) {
             console.error("[Sprint] Failed to load middlewares:", err);
         }
 
-        // Then load routes.
+        // Routes
         try {
-            const routesCandidate = path.isAbsolute(this.routesPath) ? this.routesPath : path.join(callerDir, this.routesPath);
-            if (fs.existsSync(routesCandidate) && fs.statSync(routesCandidate).isDirectory()) await this.loadRoutes(routesCandidate);
+            const fullPath = resolve(routesCandidate);
+            if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) await this.loadRoutes(fullPath);
+            else console.warn(`[Sprint] Routes folder not found at: ${fullPath}`);
         } catch (err) {
             console.error("[Sprint] Failed to load routes:", err);
         }
 
-        // Load cronjobs.
+        // Cronjobs.
         try {
-            const cronjobsCandidate = path.isAbsolute(this.cronjobsPath) ? this.cronjobsPath : path.join(callerDir, this.cronjobsPath);
-            if (fs.existsSync(cronjobsCandidate) && fs.statSync(cronjobsCandidate).isDirectory()) await this.loadCronJobs(cronjobsCandidate);
-            else if (isVerbose) console.log(`[Sprint] Cronjobs folder not found at: ${cronjobsCandidate}, skipping.`);
+            const fullPath = resolve(cronjobsCandidate);
+            if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) await this.loadCronJobs(fullPath);
+            else if (isVerbose) console.log(`[Sprint] Cronjobs folder not found at: ${fullPath}, skipping.`);
         } catch (err) {
             console.error("[Sprint] Failed to load cronjobs:", err);
         }
@@ -385,13 +402,14 @@ export class Sprint {
      * Load all middleware files from the middlewares folder
      */
     private async loadMiddlewares(middlewaresPath: string): Promise<void> {
+        const fileExtensions = isProd ? [".mjs", ".js"] : [".ts"];
         const files = await fs.promises.readdir(middlewaresPath);
 
         for (const file of files) {
             const filePath = path.join(middlewaresPath, file);
             const stat = await fs.promises.stat(filePath);
 
-            if (stat.isFile() && (file.endsWith(".ts") || file.endsWith(".js"))) {
+            if (stat.isFile() && fileExtensions.some(ext => file.endsWith(ext))) {
                 try {
                     const moduleUrl = pathToFileURL(filePath).href;
                     const module = await import(moduleUrl);
@@ -404,6 +422,7 @@ export class Sprint {
                             name,
                             filePath
                         });
+                        this.counters.middlewares++;
                         if (isVerbose) console.log(`[Sprint] Loaded middleware: ${name} (priority: ${config.priority ?? 100})`);
                     }
                 } catch (err) {
@@ -412,7 +431,7 @@ export class Sprint {
             }
         }
 
-        // Sort middlewares by priority after loading
+        // Sort middlewares by priority after loading.
         this.loadedMiddlewares.sort((a, b) => (a.priority ?? 100) - (b.priority ?? 100));
     };
 
@@ -434,6 +453,7 @@ export class Sprint {
     };
 
     private async loadRoutes(routesPath: string) {
+        const fileExtensions = isProd ? [".mjs", ".js"] : [".ts"];
         const walkDir = async (dir: string) => {
             const files = await fs.promises.readdir(dir);
             for (const file of files) {
@@ -441,7 +461,7 @@ export class Sprint {
                 const stat = await fs.promises.stat(filePath);
 
                 if (stat.isDirectory()) await walkDir(filePath);
-                else if (stat.isFile() && (file.endsWith(".ts") || file.endsWith(".js"))) {
+                else if (stat.isFile() && fileExtensions.some(ext => file.endsWith(ext))) {
                     try {
                         const moduleUrl = pathToFileURL(filePath).href;
                         const module = await import(moduleUrl);
@@ -449,7 +469,7 @@ export class Sprint {
                         const router: ExpressRouter | undefined = module.default || module.router;
 
                         if (router && typeof router === "function" && router.stack && Array.isArray(router.stack)) {
-                            let routePath = "/" + path.relative(routesPath, filePath).replace(/\.(ts|js)$/, "").replace(/\\/g, "/");
+                            let routePath = "/" + path.relative(routesPath, filePath).replace(/\.(ts|js|mjs)$/, "").replace(/\\/g, "/");
 
                             // Strip route groups (folders wrapped in parentheses) from the path.
                             routePath = stripRouteGroups(routePath);
@@ -472,7 +492,7 @@ export class Sprint {
                                     for (const routeLayer of route.stack) {
                                         // routeLayer.handle can be a single handler or an array of handlers
                                         const handlers = Array.isArray(routeLayer.handle) ? routeLayer.handle : [routeLayer.handle];
-                                        
+
                                         // Find the schema in the handlers (it's usually the first one)
                                         let schema: any;
                                         for (const handler of handlers) {
@@ -503,6 +523,7 @@ export class Sprint {
                                 this.app.use(finalRoute, router);
                                 if (isVerbose) console.log(`[Sprint] Loaded route: ${finalRoute} -> ${filePath}`);
                             }
+                            this.counters.routes += router.stack.length;
                         }
                     } catch (err) {
                         console.warn(`[Sprint] Failed to load route ${filePath}:`, err);
@@ -515,17 +536,19 @@ export class Sprint {
     };
 
     private async loadCronJobs(cronjobsPath: string): Promise<void> {
+        const fileExtensions = isProd ? [".mjs", ".js"] : [".ts"];
         const files = await fs.promises.readdir(cronjobsPath);
 
         for (const file of files) {
             const filePath = path.join(cronjobsPath, file);
             const stat = await fs.promises.stat(filePath);
 
-            if (stat.isFile() && (file.endsWith(".ts") || file.endsWith(".js"))) {
+            if (stat.isFile() && fileExtensions.some(ext => file.endsWith(ext))) {
                 try {
                     const moduleUrl = pathToFileURL(filePath).href;
                     await import(moduleUrl);
                     if (isVerbose) console.log(`[Sprint] Loaded cronjob: ${file.replace(/\.(ts|js)$/, "")}`);
+                    this.counters.cronjobs++;
                 } catch (err) {
                     console.warn(`[Sprint] Failed to load cronjob ${filePath}:`, err);
                 }
@@ -633,16 +656,16 @@ export class Sprint {
                 const authSchema = route.schema.sprint.authorization;
                 const description = authSchema._def?.description;
                 let sources: string[] = ["query:token", "headers:authorization"];
-                
+
                 if (description) {
                     try {
                         const parsed = JSON.parse(description);
                         if (parsed.__sprintAuthorization && parsed.sources) sources = Array.isArray(parsed.sources) ? parsed.sources : [parsed.sources];
-                    } catch {}
+                    } catch { }
                 }
-                
+
                 const isRequired = sources.length === 1;
-                
+
                 for (const source of sources) {
                     const [type, key] = source.split(":");
                     if (type === "query") {
@@ -667,41 +690,41 @@ export class Sprint {
             if (this.openapi.generateOnBuild) {
                 try {
                     const routeMiddlewares = this.getMiddlewaresForRoute(route.path);
-                    
+
                     for (const mw of this.loadedMiddlewares) {
                         const includePatterns = Array.isArray(mw.include) ? mw.include : [mw.include || "/**"];
                         const excludePatterns = Array.isArray(mw.exclude) ? mw.exclude : (mw.exclude ? [mw.exclude] : []);
-                        
+
                         const isIncluded = matchesPatterns(includePatterns, route.path);
                         const isExcluded = excludePatterns.length > 0 && matchesPatterns(excludePatterns, route.path);
-                        
+
                         if (isIncluded && !isExcluded && (mw as any).__sprintMiddlewareSchema) {
                             const mwSchema = (mw as any).__sprintMiddlewareSchema;
-                            
+
                             if (mwSchema.queryParams) {
                                 const params = this.zodParamsToOpenAPI(mwSchema.queryParams);
                                 if (params.length > 0) allParams.push(...params);
                             }
-                            
+
                             if (mwSchema.headers) {
                                 const headers = this.zodHeadersToOpenAPI(mwSchema.headers);
                                 if (headers.length > 0) allParams.push(...headers);
                             }
-                            
+
                             if (mwSchema.sprint?.authorization) {
                                 const authSchema = mwSchema.sprint.authorization;
                                 const description = authSchema._def?.description;
                                 let sources: string[] = ["query:token", "headers:authorization"];
-                                
+
                                 if (description) {
                                     try {
                                         const parsed = JSON.parse(description);
                                         if (parsed.__sprintAuthorization && parsed.sources) sources = Array.isArray(parsed.sources) ? parsed.sources : [parsed.sources];
-                                    } catch {}
+                                    } catch { }
                                 }
-                                
+
                                 const isRequired = sources.length === 1;
-                                
+
                                 for (const source of sources) {
                                     const [type, key] = source.split(":");
                                     if (type === "query") {
@@ -748,21 +771,21 @@ export class Sprint {
 
     private zodSchemaToOpenAPI(schema: any): any {
         if (!schema) return {};
-        
+
         // Handle ZodObject
         if (schema._def?.typeName === "ZodObject" || schema.shape) {
             const shape = schema.shape || schema._def?.shape();
             if (!shape) return {};
-            
+
             const properties: any = {};
             const required: string[] = [];
-            
+
             for (const [key, value] of Object.entries(shape)) {
                 const zodDef = (value as any)._def;
                 const typeName = zodDef?.typeName;
-                
+
                 let propSchema: any = {};
-                
+
                 if (typeName === "ZodString") propSchema = { type: "string" };
                 else if (typeName === "ZodNumber") propSchema = { type: "number" };
                 else if (typeName === "ZodBoolean") propSchema = { type: "boolean" };
@@ -770,38 +793,38 @@ export class Sprint {
                 else if (typeName === "ZodObject") propSchema = this.zodSchemaToOpenAPI(zodDef?.type);
                 else if (typeName === "ZodOptional") continue;
                 else propSchema = { type: "string" };
-                
+
                 properties[key] = propSchema;
-                
+
                 // Check if required (not optional)
                 if (!zodDef?.isOptional && typeName !== "ZodOptional") required.push(key);
             }
-            
+
             return { type: "object", properties, required: required.length > 0 ? required : undefined };
         }
-        
+
         return {};
     };
 
     private zodParamsToOpenAPI(schema: any): any[] {
         if (!schema) return [];
-        
+
         const params: any[] = [];
         const shape = schema.shape || schema._def?.shape();
-        
+
         if (!shape) return [];
-        
+
         for (const [key, value] of Object.entries(shape)) {
             const zodDef = (value as any)._def;
             const typeName = zodDef?.typeName;
-            
+
             let paramSchema: any = {};
-            
+
             if (typeName === "ZodString") paramSchema = { type: "string" };
             else if (typeName === "ZodNumber") paramSchema = { type: "number" };
             else if (typeName === "ZodBoolean") paramSchema = { type: "boolean" };
             else paramSchema = { type: "string" };
-            
+
             params.push({
                 name: key,
                 in: "query",
@@ -809,29 +832,29 @@ export class Sprint {
                 schema: paramSchema
             });
         }
-        
+
         return params;
     };
 
     private zodHeadersToOpenAPI(schema: any): any[] {
         if (!schema) return [];
-        
+
         const headers: any[] = [];
         const shape = schema.shape || schema._def?.shape();
-        
+
         if (!shape) return [];
-        
+
         for (const [key, value] of Object.entries(shape)) {
             const zodDef = (value as any)._def;
             const typeName = zodDef?.typeName;
-            
+
             let paramSchema: any = {};
-            
+
             if (typeName === "ZodString") paramSchema = { type: "string" };
             else if (typeName === "ZodNumber") paramSchema = { type: "number" };
             else if (typeName === "ZodBoolean") paramSchema = { type: "boolean" };
             else paramSchema = { type: "string" };
-            
+
             headers.push({
                 name: key,
                 in: "header",
@@ -839,7 +862,7 @@ export class Sprint {
                 schema: paramSchema
             });
         }
-        
+
         return headers;
     };
 
@@ -851,13 +874,13 @@ export class Sprint {
     public patch(path: string, handler: Handler) { return this.app.patch(this.applyPrefix(path), handler); }
     public use(pathOrHandler: string | Handler | MiddlewareConfig, maybeHandler?: Handler) {
         if (typeof pathOrHandler === "string" && maybeHandler) return this.app.use(this.applyPrefix(pathOrHandler), maybeHandler);
-        
+
         if (pathOrHandler && typeof pathOrHandler === "object" && "handler" in pathOrHandler) {
             const config = pathOrHandler as MiddlewareConfig;
             const handlers = Array.isArray(config.handler) ? config.handler : [config.handler];
             return this.app.use(...handlers);
         }
-        
+
         return this.app.use(pathOrHandler as Handler);
     };
 
@@ -865,17 +888,17 @@ export class Sprint {
         this.graphqlSchema = schema;
     };
 
-public listen(callback?: () => void): void {
+    public listen(callback?: () => void): void {
         const isDev = process.env.NODE_ENV === "development";
         const basePort = this.app.get("port") || 5000;
         const triedPorts: number[] = [];
         let serverStarted = false;
-        
+
         const tryListen = (port: number): void => {
             triedPorts.push(port);
-            
+
             this.server = http.createServer(this.app);
-            
+
             this.server.listen(port, () => {
                 serverStarted = true;
                 const prefixInfo = this.prefix ? this.prefix : "/";
@@ -891,8 +914,13 @@ public listen(callback?: () => void): void {
                 console.log(`   ${dim}Local:${reset}                http://localhost:${bold}${port}${reset}`);
                 console.log(`   ${dim}Prefix:${reset}               ${bold}${prefixInfo}${reset}`);
                 console.log(`   ${dim}Healthcheck:${reset}          http://localhost:${port}/healthcheck ${dim}(also available at /health)${reset}`);
+                console.log("");
+                console.log(`   ${dim}Loaded routes:${reset}        ${bold}${this.counters.routes}${reset}`);
+                console.log(`   ${dim}Loaded middlewares:${reset}   ${bold}${this.counters.middlewares}${reset}`);
+                console.log(`   ${dim}Loaded cronjobs:${reset}      ${bold}${this.counters.cronjobs}${reset}`);
+
                 if (this.openapi.generateOnBuild || this.openapi.swaggerUi.enabled) console.log("");
-                if (this.openapi.generateOnBuild) console.log(`   ${dim}OpenAPI Spec:${reset}         http://localhost:${port}${this.openapi.path}`);    
+                if (this.openapi.generateOnBuild) console.log(`   ${dim}OpenAPI Spec:${reset}         http://localhost:${port}${this.openapi.path}`);
                 if (this.openapi.swaggerUi.enabled) console.log(`   ${dim}Swagger UI:${reset}           http://localhost:${port}${this.openapi.swaggerUi.path}`);
                 if (this.graphql.enabled || this.graphql.graphiql.enabled) console.log("");
                 if (this.graphql.enabled) console.log(`   ${dim}GraphQL API:${reset}          http://localhost:${port}${this.graphql.path}`);
@@ -921,10 +949,6 @@ public listen(callback?: () => void): void {
         };
 
         tryListen(basePort);
-
-        this.routesLoaded.then(() => {
-            this.loadNotFound();
-            if (callback) callback();
-        });
+        if (callback) callback();
     };
 };

@@ -1,6 +1,6 @@
 {
     "name": "sprint-es",
-    "version": "0.0.90",
+    "version": "0.0.135",
     "description": "Sprint - Quickly API",
     "main": "dist/cjs/index.js",
     "module": "dist/esm/index.js",
@@ -49,6 +49,31 @@
             "import": "./dist/esm/modules/utils/index.js"
         }
     },
+    "typesVersions": {
+        "*": {
+            "logger": [
+                "dist/types/modules/logger/index.d.ts"
+            ],
+            "rate-limit": [
+                "dist/types/modules/rate-limit/index.d.ts"
+            ],
+            "telemetry": [
+                "dist/types/modules/telemetry/index.d.ts"
+            ],
+            "schemas": [
+                "dist/types/modules/schemas/index.d.ts"
+            ],
+            "cronjobs": [
+                "dist/types/modules/cronjobs/index.d.ts"
+            ],
+            "jwt": [
+                "dist/types/modules/jwt/index.d.ts"
+            ],
+            "utils": [
+                "dist/types/modules/utils/index.d.ts"
+            ]
+        }
+    },
     "files": [
         "dist/**/*",
         "README.md",
@@ -82,12 +107,14 @@
         "axios": "^1.13.2",
         "cors": "^2.8.5",
         "dotenv": "^17.3.1",
+        "esbuild": "^0.27.3",
         "express": "^5.1.0",
         "morgan": "^1.10.1",
         "node-cron": "^3.0.3",
         "path": "^0.12.7",
         "serve-favicon": "^2.5.1",
         "toolkitify": "^0.0.26",
+        "tsc-esm-fix": "^3.1.2",
         "tsx": "^4.19.0",
         "zod": "^3.25.0"
     },
