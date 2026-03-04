@@ -16,7 +16,7 @@ export function generateJWTKeys(): JWTKeys {
 
 export function getTypeScriptPackageJson(name: string, telemetry: string, swagger: boolean, graphql: boolean) {
     const deps: Record<string, string> = {
-        "sprint-es": "^0.0.135"
+        "sprint-es": "^0.0.136"
     };
 
     const devDeps: Record<string, string> = {
@@ -73,7 +73,7 @@ export function getTypeScriptPackageJson(name: string, telemetry: string, swagge
 
 export function getJavaScriptPackageJson(name: string, telemetry: string, swagger: boolean, graphql: boolean) {
     const deps: Record<string, string> = {
-        "sprint-es": "^0.0.135"
+        "sprint-es": "^0.0.136"
     };
 
     if (telemetry === "sentry" || telemetry === "glitchtip") deps["@sentry/node"] = "^8.0.0";

@@ -516,43 +516,43 @@ async function runDoctor() {
 };
 
 async function main() {
+    const hasDist = existsSync(join(projectRoot, "dist"));
+    const hasTsConfig = existsSync(join(projectRoot, "tsconfig.json"));
+
     switch (command) {
         case "dev": {
             console.log("🚀 Starting development server with hot reload...");
-            const isTS = existsSync(join(projectRoot, "sprint.config.ts"));
-            const srcFile = isTS
-                ? existsSync(join(projectRoot, "src/app.ts")) ? "src/app.ts" : "src/index.ts"
-                : existsSync(join(projectRoot, "src/app.js")) ? "src/app.js" : "src/index.js";
-            const devCmd = isTS
-                ? `tsx --watch ${srcFile}`
-                : `node --watch ${srcFile}`;
+            let srcFile: string;
+            let devCmd: string;
+
+            if (hasTsConfig) {
+                srcFile = existsSync(join(projectRoot, "src/app.ts")) ? "src/app.ts" : "src/index.ts";
+                devCmd = `tsx --watch ${srcFile}`;
+            } else {
+                srcFile = existsSync(join(projectRoot, "src/app.js")) ? "src/app.js" : existsSync(join(projectRoot, "src/app.mjs")) ? "src/app.mjs" : existsSync(join(projectRoot, "src/index.js")) ? "src/index.js" : "src/index.mjs";
+                devCmd = `node --watch ${srcFile}`;
+            }
+
             await runCommand(devCmd, { NODE_ENV: "development" });
             break;
         }
         case "build": {
             console.log("🚀 Building for production...");
-            const isTS = existsSync(join(projectRoot, "sprint.config.ts"));
             const distPath = join(projectRoot, "dist");
             const tsconfigPath = join(projectRoot, "tsconfig.json");
+            const hasSprintConfigTs = existsSync(join(projectRoot, "sprint.config.ts"));
 
             console.log("[Sprint] Cleaning dist...");
             rmSync(distPath, { recursive: true, force: true });
             console.log("[Sprint] dist cleaned ✓");
 
             console.log("[Sprint] Compiling with tsup...");
-
-            await runCommand(
-                `tsc && tsup`,
-                { NODE_ENV: "production" }
-            );
+            await runCommand(`tsc && tsup`, { NODE_ENV: "production" });
             console.log("[Sprint] Compilation completed ✓");
 
-            if (isTS) {
+            if (hasSprintConfigTs) {
                 console.log("[Sprint] Compiling sprint.config.ts...");
-                await runCommand(
-                    `tsup sprint.config.ts --outDir "${distPath}" --format cjs --tsconfig "${tsconfigPath}" --clean false`,
-                    { NODE_ENV: "production" }
-                );
+                await runCommand(`tsup sprint.config.ts --outDir "${distPath}" --format cjs --tsconfig "${tsconfigPath}" --clean false`, { NODE_ENV: "production" });
                 console.log("[Sprint] sprint.config.js generated ✓");
             }
 
@@ -561,35 +561,26 @@ async function main() {
         }
         case "start": {
             console.log("🚀 Starting production server...");
-            const isTS = existsSync(join(projectRoot, "sprint.config.ts"));
-
             let entryFile: string | null = null;
 
-            if (isTS) {
-                const candidates = [
-                    "dist/app.mjs",
-                    "dist/app.js",
-                    "dist/index.mjs",
-                    "dist/index.js",
-                ];
+            if (hasDist) {
+                const candidates = ["dist/app.mjs", "dist/app.js", "dist/index.mjs", "dist/index.js"];
                 entryFile = candidates.find(f => existsSync(join(projectRoot, f))) ?? null;
-            } else {
-                const candidates = [
-                    "src/app.js",
-                    "src/app.mjs",
-                    "src/index.js",
-                    "src/index.mjs",
-                ];
-                entryFile = candidates.find(f => existsSync(join(projectRoot, f))) ?? null;
-            }
 
-            if (!entryFile) {
-                console.error(`[Sprint] Entry file not found.`);
-                console.error(isTS
-                    ? "[Sprint] Did you run 'sprint-es build' first? Expected dist/app.mjs or dist/index.mjs"
-                    : "[Sprint] Expected src/app.js or src/index.js"
-                );
-                process.exit(1);
+                if (!entryFile) {
+                    console.error("[Sprint] Entry file not found in dist/.");
+                    console.error("[Sprint] Expected dist/app.mjs or dist/index.mjs");
+                    process.exit(1);
+                }
+            } else {
+                const candidates = ["src/app.js", "src/app.mjs", "src/index.js", "src/index.mjs"];
+                entryFile = candidates.find(f => existsSync(join(projectRoot, f))) ?? null;
+
+                if (!entryFile) {
+                    console.error("[Sprint] Entry file not found in src/.");
+                    console.error("[Sprint] Expected src/app.js or src/index.js");
+                    process.exit(1);
+                }
             }
 
             await runCommand(`node "${join(projectRoot, entryFile)}"`, { NODE_ENV: "production" });
