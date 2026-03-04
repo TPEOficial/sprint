@@ -406,7 +406,7 @@ switch (command) {
         break;
     case "start":
         console.log("🚀 Starting production server...");
-        runCommand("node dist/index.js", { NODE_ENV: "production" });
+        runCommand("node dist/app.js", { NODE_ENV: "production" });
         break;
     case "doctor":
         runDoctor();
