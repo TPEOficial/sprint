@@ -43,8 +43,7 @@ temp/
 export function getDockerIgnore() {
     return `node_modules
 npm-debug.log
-.env
-.env.*
+.env.development
 .git
 .gitignore
 README.md
