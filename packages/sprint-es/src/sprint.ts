@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 import { pathToFileURL } from "url";
 import { RateLimiter } from "toolkitify/rate-limit";
 import { isVerbose, matchesPatterns, stripRouteGroups, deepMerge } from "./utils";
-import { Handler, SprintOptions, SprintConfig, MiddlewareConfig, LoadedMiddleware } from "./types";
+import { Handler, SprintOptions, SprintConfig, MiddlewareConfig, LoadedMiddleware, MiddlewareSchema } from "./types";
 import express, { Application, RequestHandler, Router as ExpressRouter, Request } from "express";
 import { AuthorizationSource, SprintRequest } from "./types";
 
@@ -80,7 +80,7 @@ export class Sprint {
     private prefix: string = "";
     private routesLoaded!: Promise<void>;
     private server!: http.Server;
-    private loadedMiddlewares: LoadedMiddleware[] = [];
+    private loadedMiddlewares: LoadedMiddleware<MiddlewareSchema>[] = [];
     private counters = { routes: 0, middlewares: 0, cronjobs: 0 };
     private openapi: {
         generateOnBuild: boolean;

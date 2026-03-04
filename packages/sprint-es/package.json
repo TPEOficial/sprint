@@ -1,6 +1,6 @@
 {
     "name": "sprint-es",
-    "version": "0.0.138",
+    "version": "0.0.147",
     "description": "Sprint - Quickly API",
     "main": "dist/cjs/index.js",
     "module": "dist/esm/index.js",
@@ -104,6 +104,7 @@
     },
     "homepage": "https://dymo.tpeoficial.com",
     "dependencies": {
+        "@types/express": "^5.0.5",
         "axios": "^1.13.2",
         "cors": "^2.8.5",
         "dotenv": "^17.3.1",
@@ -122,7 +123,6 @@
     ],
     "devDependencies": {
         "@types/cors": "^2.8.19",
-        "@types/express": "^5.0.5",
         "@types/jest": "^30.0.0",
         "@types/morgan": "^1.9.10",
         "@types/node": "^22.18.7",

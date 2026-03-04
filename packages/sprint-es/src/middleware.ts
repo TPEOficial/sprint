@@ -89,7 +89,9 @@ function createSchemaValidationMiddleware(schema: MiddlewareSchema): RequestHand
             else (req.sprint as any).authorization = authValue;
         }
 
-        if (errors.length > 0) return res.status(400).json({ error: "Validation failed", details: errors });
+        const errorCode = errors.length === 1 && errors[0]?.location === "sprint.authorization" ? 401 : 400;
+
+        if (errors.length > 0) return res.status(errorCode).json({ error: "Validation failed", details: errors });
         next();
     };
 };
@@ -117,7 +119,9 @@ function createSchemaValidationMiddleware(schema: MiddlewareSchema): RequestHand
  *     priority: 10
  * });
  */
-export function defineMiddleware(config: MiddlewareConfig): MiddlewareConfig {
+export function defineMiddleware<TSchema extends MiddlewareSchema>(
+    config: MiddlewareConfig<TSchema>
+): MiddlewareConfig<TSchema> {
     const wrapHandler = (handler: RequestHandler | AsyncRequestHandler): RequestHandler => {
         return (req, res, next) => {
             const result = handler(req, res, next);
@@ -127,25 +131,18 @@ export function defineMiddleware(config: MiddlewareConfig): MiddlewareConfig {
 
     const handlers: RequestHandler[] = [];
 
-    if (config.schema) {
-        handlers.push(createSchemaValidationMiddleware(config.schema));
-    }
+    if (config.schema) handlers.push(createSchemaValidationMiddleware(config.schema));
 
     const originalHandler = config.handler;
-    if (Array.isArray(originalHandler)) {
-        handlers.push(...originalHandler.map(wrapHandler));
-    } else {
-        handlers.push(wrapHandler(originalHandler));
-    }
+    if (Array.isArray(originalHandler)) handlers.push(...originalHandler.map(wrapHandler));
+    else handlers.push(wrapHandler(originalHandler));
 
-    const finalConfig: MiddlewareConfig = {
+    const finalConfig: MiddlewareConfig<TSchema> = {
         ...config,
         handler: handlers
     };
 
-    if (config.schema) {
-        (finalConfig as any).__sprintMiddlewareSchema = config.schema;
-    }
+    if (config.schema) (finalConfig as any).__sprintMiddlewareSchema = config.schema;
 
     return finalConfig;
 };

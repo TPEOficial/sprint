@@ -5,11 +5,12 @@
         "moduleResolution": "Bundler",
         "types": [
             "jest",
-            "node"
+            "node",
+            "express"
         ],
         "strict": true,
         "esModuleInterop": true,
-        "skipLibCheck": true,
+        "skipLibCheck": false,
         "forceConsistentCasingInFileNames": true,
         "declaration": true,
         "declarationMap": true,

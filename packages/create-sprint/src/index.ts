@@ -65,8 +65,8 @@ export async function runCLI(args: string[]) {
                         message: "Language:",
                         options: [
                             { value: "typescript", label: "TypeScript", hint: "recommended" },
-                            { value: "javascript", label: "JavaScript" },
-                        ],
+                            { value: "javascript", label: "JavaScript", hint: "not recommended" }
+                        ]
                     }),
 
                 telemetry: () =>

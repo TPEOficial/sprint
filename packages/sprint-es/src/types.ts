@@ -44,7 +44,7 @@ export interface MiddlewareSchema {
  * Configuration for a middleware defined in the middlewares folder.
  * Export this from your middleware file using `defineMiddleware()`.
  */
-export interface MiddlewareConfig {
+export interface MiddlewareConfig<TSchema extends MiddlewareSchema = MiddlewareSchema> {
     /** The middleware function(s) to execute. Supports both sync and async handlers. */
     handler: RequestHandler | AsyncRequestHandler | (RequestHandler | AsyncRequestHandler)[];
     /**
@@ -73,10 +73,11 @@ export interface MiddlewareConfig {
      * Schema for request validation and OpenAPI generation.
      * Supports body, queryParams, params, headers, and sprint.authorization.
      */
-    schema?: MiddlewareSchema;
+    schema?: TSchema;
 }
 
-export interface LoadedMiddleware extends MiddlewareConfig {
+export interface LoadedMiddleware<TSchema extends MiddlewareSchema = MiddlewareSchema>
+    extends MiddlewareConfig<TSchema> {
     name: string;
     filePath: string;
 }

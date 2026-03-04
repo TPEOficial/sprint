@@ -13,8 +13,7 @@ export default defineMiddleware({
         }
     },
     handler: (req: SprintRequest, res: SprintResponse, next: NextFunction) => {
-        const auth = req.sprint.authorization;
-        if (!auth) return res.status(401).json({ error: "No authorization header" });
+        const auth = req.sprint.authorization!;
 
         const token = auth.replace("Bearer ", "");
 
@@ -38,8 +37,7 @@ export default defineMiddleware({
         }
     },
     handler: (req, res, next) => {
-        const auth = req.sprint.authorization;
-        if (!auth)  return res.status(401).json({ error: "No authorization header" });
+        const auth = req.sprint.authorization!;
         
         const token = auth.replace("Bearer ", "");
 
