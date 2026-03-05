@@ -57,7 +57,7 @@ export async function runCLI(args: string[]) {
                     p.text({
                         message: "Project name:",
                         placeholder: "my-api",
-                        validate: (v) => validateProjectName(v || "sprint-app") || undefined,
+                        validate: (v) => validateProjectName(v || "sprint-app") || undefined
                     }),
 
                 language: () =>
@@ -93,7 +93,7 @@ export async function runCLI(args: string[]) {
                 onCancel: () => {
                     p.cancel("Cancelled.");
                     process.exit(0);
-                },
+                }
             }
         );
     }
@@ -143,13 +143,7 @@ export async function runCLI(args: string[]) {
     }
 
     const cdCmd = config.projectName === "." ? "" : `cd ${config.projectName} && `;
-    p.note(
-        [
-            !installDeps ? `${cdCmd}npm install --include=dev` : "",
-            `${cdCmd}npm run dev`
-        ].filter(Boolean).join("\n"),
-        "Next steps"
-    );
+    p.note([!installDeps ? `${cdCmd}npm install --include=dev` : "", `${cdCmd}npm run dev` ].filter(Boolean).join("\n"), "Next steps");
 
     p.outro("Ready. Happy shipping.");
 };
@@ -233,9 +227,7 @@ async function createProject(
     await mkdir(join(srcDir, "config"), { recursive: true });
     await mkdir(join(srcDir, "services"), { recursive: true });
     
-    if (graphql) {
-        await mkdir(join(srcDir, "graphql"), { recursive: true });
-    }
+    if (graphql) await mkdir(join(srcDir, "graphql"), { recursive: true });
 
     if (language === "typescript") {
         await writeFile(join(srcDir, "config", "index.ts"), "");
