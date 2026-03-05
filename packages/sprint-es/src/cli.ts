@@ -521,32 +521,32 @@ const commandDependencies: Record<string, { ts?: string[]; js?: string[]; }> = {
     }
 };
 
-function checkDependencies(command: string, isTS: boolean) {
-    const config = commandDependencies[command];
-    if (!config) return [];
+// function checkDependencies(command: string, isTS: boolean) {
+//     const config = commandDependencies[command];
+//     if (!config) return [];
 
-    const deps = isTS ? config.ts ?? [] : config.js ?? [];
+//     const deps = isTS ? config.ts ?? [] : config.js ?? [];
 
-    const missing: string[] = [];
+//     const missing: string[] = [];
 
-    for (const dep of deps) {
-        const binPath = join(projectRoot, "node_modules", ".bin", dep);
-        if (!existsSync(binPath)) missing.push(dep);
-    }
+//     for (const dep of deps) {
+//         const binPath = join(projectRoot, "node_modules", ".bin", dep);
+//         if (!existsSync(binPath)) missing.push(dep);
+//     }
 
-    if (missing.length > 0) {
-        console.error("\n❌ Missing required dependencies:");
-        for (const dep of missing) {
-            console.error(`   • ${dep}`);
-        }
+//     if (missing.length > 0) {
+//         console.error("\n❌ Missing required dependencies:");
+//         for (const dep of missing) {
+//             console.error(`   • ${dep}`);
+//         }
 
-        console.error("\n👉 Install with:");
-        console.error("   npm install --save-dev " + missing.join(" "));
-        console.error("");
+//         console.error("\n👉 Install with:");
+//         console.error("   npm install --save-dev " + missing.join(" "));
+//         console.error("");
 
-        process.exit(1);
-    }
-};
+//         process.exit(1);
+//     }
+// };
 
 async function main() {
     const hasDist = existsSync(join(projectRoot, "dist"));
@@ -572,7 +572,7 @@ async function main() {
         case "build": {
             console.log("🚀 Building for production...");
 
-            checkDependencies("build", true);
+            // checkDependencies("build", true);
 
             const distPath = join(projectRoot, "dist");
             const tsconfigPath = join(projectRoot, "tsconfig.json");
