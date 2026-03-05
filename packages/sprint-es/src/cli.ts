@@ -515,6 +515,39 @@ async function runDoctor() {
     logger.break();
 };
 
+const commandDependencies: Record<string, { ts?: string[]; js?: string[]; }> = {
+    build: {
+        ts: ["tsup", "typescript"]
+    }
+};
+
+function checkDependencies(command: string, isTS: boolean) {
+    const config = commandDependencies[command];
+    if (!config) return [];
+
+    const deps = isTS ? config.ts ?? [] : config.js ?? [];
+
+    const missing: string[] = [];
+
+    for (const dep of deps) {
+        const binPath = join(projectRoot, "node_modules", ".bin", dep);
+        if (!existsSync(binPath)) missing.push(dep);
+    }
+
+    if (missing.length > 0) {
+        console.error("\n❌ Missing required dependencies:");
+        for (const dep of missing) {
+            console.error(`   • ${dep}`);
+        }
+
+        console.error("\n👉 Install with:");
+        console.error("   npm install --save-dev " + missing.join(" "));
+        console.error("");
+
+        process.exit(1);
+    }
+};
+
 async function main() {
     const hasDist = existsSync(join(projectRoot, "dist"));
     const hasTsConfig = existsSync(join(projectRoot, "tsconfig.json"));
@@ -538,9 +571,17 @@ async function main() {
         }
         case "build": {
             console.log("🚀 Building for production...");
+
+            checkDependencies("build", true);
+
             const distPath = join(projectRoot, "dist");
             const tsconfigPath = join(projectRoot, "tsconfig.json");
             const hasSprintConfigTs = existsSync(join(projectRoot, "sprint.config.ts"));
+
+            if (!hasSprintConfigTs) {
+                console.error("[Sprint] This command only works for TypeScript-based projects.");
+                process.exit(1);
+            }
 
             console.log("[Sprint] Cleaning dist...");
             rmSync(distPath, { recursive: true, force: true });

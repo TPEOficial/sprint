@@ -1,11 +1,10 @@
 {
     "name": "create-sprint",
-    "version": "0.0.128",
+    "version": "0.0.130",
     "description": "Create a new Sprint API project",
     "type": "module",
     "bin": {
-        "create-sprint": "./dist/cli.js",
-        "sprint": "./dist/cli.js"
+        "create-sprint": "./dist/cli.js"
     },
     "files": [
         "dist/**/*",

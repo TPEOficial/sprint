@@ -16,7 +16,7 @@ export function generateJWTKeys(): JWTKeys {
 
 export function getTypeScriptPackageJson(name: string, telemetry: string, swagger: boolean, graphql: boolean) {
     const deps: Record<string, string> = {
-        "sprint-es": "^0.0.150"
+        "sprint-es": "^0.0.155"
     };
 
     const devDeps: Record<string, string> = {
@@ -45,11 +45,11 @@ export function getTypeScriptPackageJson(name: string, telemetry: string, swagge
         main: "dist/app.js",
         type: "module",
         scripts: {
-            build: "sprint-es build",
-            start: "sprint-es start",
-            dev: "sprint-es dev",
-            doctor: "sprint-es doctor",
-            "generate:keys": "sprint-es generate-keys"
+            build: "sprint build",
+            start: "sprint start",
+            dev: "sprint dev",
+            doctor: "sprint doctor",
+            "generate:keys": "sprint generate-keys"
         },
         dependencies: deps,
         devDependencies: devDeps,
@@ -73,7 +73,7 @@ export function getTypeScriptPackageJson(name: string, telemetry: string, swagge
 
 export function getJavaScriptPackageJson(name: string, telemetry: string, swagger: boolean, graphql: boolean) {
     const deps: Record<string, string> = {
-        "sprint-es": "^0.0.150"
+        "sprint-es": "^0.0.155"
     };
 
     if (telemetry === "sentry" || telemetry === "glitchtip") deps["@sentry/node"] = "^8.0.0";
@@ -94,11 +94,11 @@ export function getJavaScriptPackageJson(name: string, telemetry: string, swagge
         main: "src/app.js",
         type: "module",
         scripts: {
-            build: "sprint-es build",
-            start: "sprint-es start",
-            dev: "sprint-es dev",
-            doctor: "sprint-es doctor",
-            "generate:keys": "sprint-es generate-keys"
+            build: "sprint build",
+            start: "sprint start",
+            dev: "sprint dev",
+            doctor: "sprint doctor",
+            "generate:keys": "sprint generate-keys"
         },
         dependencies: deps
     };

@@ -5,17 +5,17 @@
   "main": "dist/app.js",
   "type": "module",
   "scripts": {
-    "build": "sprint-es build",
-    "start": "sprint-es start",
-    "dev": "sprint-es dev",
-    "doctor": "sprint-es doctor",
-    "generate:keys": "sprint-es generate-keys"
+    "build": "sprint build",
+    "start": "sprint start",
+    "dev": "sprint dev",
+    "doctor": "sprint doctor",
+    "generate:keys": "sprint generate-keys"
   },
   "dependencies": {
     "graphql": "^16.13.0",
     "graphql-http": "^1.22.4",
     "ruru": "^2.0.0-rc.6",
-    "sprint-es": "^0.0.149",
+    "sprint-es": "^0.0.155",
     "swagger-ui-express": "^5.0.0"
   },
   "devDependencies": {

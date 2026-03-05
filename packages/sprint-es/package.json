@@ -1,12 +1,15 @@
 {
     "name": "sprint-es",
-    "version": "0.0.150",
+    "version": "0.0.155",
     "description": "Sprint - Quickly API",
     "main": "dist/cjs/index.js",
     "module": "dist/esm/index.js",
     "types": "dist/types/index.d.ts",
     "type": "module",
-    "bin": "dist/esm/cli.js",
+    "bin": {
+        "sprint": "dist/esm/cli.js",
+        "sprint-es": "dist/esm/cli.js"
+    },
     "exports": {
         ".": {
             "types": "./dist/types/index.d.ts",
