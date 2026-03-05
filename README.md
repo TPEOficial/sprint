@@ -10,6 +10,8 @@
   <br />
   <a href="#quickstart">Quickstart</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="https://tpe.li/D-SPRINT">Docs</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="https://tpe.li/dsc">Discord</a>
   <hr />
 </div>
@@ -62,8 +64,7 @@ npx -y create-sprint@latest
  ┣ 📜package-lock.json (It depends on specs)
  ┣ 📜package.json
  ┣ 📜sprint.config.{ts.js}
- ┣ 📜tsconfig.json (It depends on specs)
- ┗ 📜vite.config.ts (It depends on specs)
+ ┗ 📜tsconfig.json (It depends on specs)
 ```
 </details>
 

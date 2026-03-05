@@ -29,13 +29,16 @@ export function getTypeScriptPackageJson(name: string, telemetry: string, swagge
     if (telemetry === "sentry" || telemetry === "glitchtip") deps["@sentry/node"] = "^8.0.0";
     else if (telemetry === "discord") deps["axios"] = "^1.6.0";
 
-    if (swagger) deps["swagger-ui-express"] = "^5.0.0";
-    if (swagger) devDeps["@types/swagger-ui-express"] = "^4.1.8";
+    if (swagger) {
+        deps["swagger-ui-express"] = "^5.0.0";
+        devDeps["@types/swagger-ui-express"] = "^4.1.8";
+    }
 
     if (graphql) {
         deps["graphql"] = "^16.13.0";
         deps["graphql-http"] = "^1.22.4";
         deps["ruru"] = "^2.0.0-rc.6";
+        devDeps["@types/swagger-ui-express"] = "^4.1.8";
     }
 
     return {
