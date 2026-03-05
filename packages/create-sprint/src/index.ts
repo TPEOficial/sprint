@@ -145,7 +145,7 @@ export async function runCLI(args: string[]) {
     const cdCmd = config.projectName === "." ? "" : `cd ${config.projectName} && `;
     p.note(
         [
-            !installDeps ? `${cdCmd}npm install` : "",
+            !installDeps ? `${cdCmd}npm install --include=dev` : "",
             `${cdCmd}npm run dev`
         ].filter(Boolean).join("\n"),
         "Next steps"
