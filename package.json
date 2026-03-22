@@ -1,0 +1,37 @@
+{
+  "name": "sprint",
+  "version": "1.0.0",
+  "description": "<div align=\"center\">\r   <br />\r   <img src=\"./docs/images/banner.png\" alt=\"Sprint Banner\" />\r   <h1>Sprint — Edge Server [EXPERIMENTAL]</h1>\r   <p>A next-generation backend framework that enables instant API development with a single command, enforcing clean structure by default and eliminating repetitive code while keeping projects fast, organized, and scalable.</p>\r   <img src=\"https://img.shields.io/badge/TypeScript-purple?style=for-the-badge&logo=typescript&logoColor=white\"/> \r   <a href=\"https://github.com/TPEOficial\"> <img alt=\"GitHub\" src=\"https://img.shields.io/badge/GitHub-purple?style=for-the-badge&logo=github&logoColor=white\"/></a>\r   <a href=\"https://ko-fi.com/fjrg2007\"> <img alt=\"Kofi\" src=\"https://img.shields.io/badge/Ko--fi-purple?style=for-the-badge&logo=ko-fi&logoColor=white\"></a>\r   <br />\r   <br />\r   <a href=\"#quickstart\">Quickstart</a>\r   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>\r   <a href=\"https://tpe.li/D-SPRINT\">Docs</a>\r   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>\r   <a href=\"https://tpe.li/dsc\">Discord</a>\r   <hr />\r </div>",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "example": "examples"
+  },
+  "workspaces": [
+    "packages/**"
+  ],
+  "scripts": {
+    "clean:backend": "npm run clean --workspace=backend",
+    "build:backend": "npm run build --workspace=backend",
+    "build:create-sprint": "npm run build --workspace=create-sprint",
+    "dev:backend": "npm run dev --workspace=backend",
+    "start:backend": "npm run start --workspace=backend",
+    "start:create-sprint": "npm run start --workspace=create-sprint",
+    "prepublishOnly:backend": "npm run prepublishOnly --workspace=backend",
+    "prepublishOnly:create-sprint": "npm run prepublishOnly --workspace=create-sprint",
+    "test:backend": "npm run test --workspace=backend",
+    "dev:backend-example": "npm run dev:example --workspace=backend"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TPEOficial/sprint.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/TPEOficial/sprint/issues"
+  },
+  "homepage": "https://github.com/TPEOficial/sprint#readme"
+}
