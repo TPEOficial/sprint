@@ -5,7 +5,7 @@ import { join } from "path";
 import color from "picocolors";
 import * as p from "@clack/prompts";
 import { validateProjectName } from "./validators.js";
-import { getTypeScriptPackageJson, getJavaScriptPackageJson, getTsConfig, getMainFile, getHomeRoute, getAdminRoute, getHomeController, getAdminController, getEnvExample, getInternalAuthMiddleware, getUserAuthMiddleware, getHomeSchema, getAdminSchema, getDockerfile, getDockerCompose, getGitignore, getDockerIgnore, getSprintConfigFile, getEnvDevelopment, getEnvProduction, getExampleCronJob, getGraphQLFiles } from "./generators.js";
+import { getTypeScriptPackageJson, getJavaScriptPackageJson, getTsConfig, getMainFile, getHomeRoute, getAdminRoute, getUploadRoute, getHomeController, getAdminController, getUploadController, getEnvExample, getInternalAuthMiddleware, getUserAuthMiddleware, getHomeSchema, getAdminSchema, getUploadSchema, getDockerfile, getDockerCompose, getGitignore, getDockerIgnore, getSprintConfigFile, getEnvDevelopment, getEnvProduction, getExampleCronJob, getGraphQLFiles } from "./generators.js";
 
 type TelemetryProviders =  "none" | "sentry" | "glitchtip" | "discord" | "open-telemetry" | "telegram" | "nodemailer";
 
@@ -48,7 +48,7 @@ export async function runCLI(args: string[]) {
             telemetry: options.telemetry ?? "none",
             swagger: options.swagger ?? true,
             graphql: options.graphql ?? false,
-            docker: options.docker || false,
+            docker: options.docker || false
         };
     } else {
         config = await p.group(
@@ -87,7 +87,7 @@ export async function runCLI(args: string[]) {
 
                 graphql: () => p.confirm({ message: "Add GraphQL support?", initialValue: false }),
 
-                docker: () => p.confirm({ message: "Add Docker support?", initialValue: false }),
+                docker: () => p.confirm({ message: "Add Docker support?", initialValue: false })
             },
             {
                 onCancel: () => {
@@ -243,15 +243,18 @@ async function createProject(
 
     await writeFile(join(srcDir, "routes", "home." + (language === "typescript" ? "ts" : "js")), getHomeRoute(language));
     await writeFile(join(srcDir, "routes", "admin." + (language === "typescript" ? "ts" : "js")), getAdminRoute(language));
+    await writeFile(join(srcDir, "routes", "upload." + (language === "typescript" ? "ts" : "js")), getUploadRoute(language));
 
     await writeFile(join(srcDir, "controllers", "home." + (language === "typescript" ? "ts" : "js")), getHomeController(language));
     await writeFile(join(srcDir, "controllers", "admin." + (language === "typescript" ? "ts" : "js")), getAdminController(language));
+    await writeFile(join(srcDir, "controllers", "upload." + (language === "typescript" ? "ts" : "js")), getUploadController(language));
 
     await writeFile(join(srcDir, "middlewares", "auth.internal." + (language === "typescript" ? "ts" : "js")), getInternalAuthMiddleware(language));
     await writeFile(join(srcDir, "middlewares", "auth.user." + (language === "typescript" ? "ts" : "js")), getUserAuthMiddleware(language));
 
     await writeFile(join(srcDir, "schemas", "home." + (language === "typescript" ? "ts" : "js")), getHomeSchema(language));
     await writeFile(join(srcDir, "schemas", "admin." + (language === "typescript" ? "ts" : "js")), getAdminSchema(language));
+    await writeFile(join(srcDir, "schemas", "upload." + (language === "typescript" ? "ts" : "js")), getUploadSchema(language));
 
     await writeFile(join(srcDir, "cronjobs", "example." + (language === "typescript" ? "ts" : "js")), getExampleCronJob(language));
 

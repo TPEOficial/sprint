@@ -8,16 +8,16 @@ export { getTsConfig, getSprintConfigFile } from "./configFiles.js";
 export { getEnvExample, getEnvDevelopment, getEnvProduction } from "./env.js";
 
 // Routes
-export { getMainFile, getHomeRoute, getAdminRoute } from "./routes.js";
+export { getMainFile, getHomeRoute, getAdminRoute, getUploadRoute } from "./routes.js";
 
 // Controllers
-export { getHomeController, getAdminController } from "./controllers.js";
+export { getHomeController, getAdminController, getUploadController } from "./controllers.js";
 
 // Middlewares
 export { getInternalAuthMiddleware, getUserAuthMiddleware } from "./middlewares.js";
 
 // Schemas
-export { getHomeSchema, getAdminSchema } from "./schemas.js";
+export { getHomeSchema, getAdminSchema, getUploadSchema } from "./schemas.js";
 
 // Cronjobs
 export { getExampleCronJob } from "./cronjobs.js";

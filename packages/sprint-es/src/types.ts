@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction, RequestHandler } from "express";
 import { ZodSchema } from "./modules/schemas/types";
+import { Sprint } from "./sprint";
 
 export type AsyncRequestHandler = (req: SprintRequest, res: SprintResponse, next: NextFunction) => Promise<any>;
 export type Handler = (req: SprintRequest, res: SprintResponse, next: NextFunction) => any;
@@ -120,6 +121,8 @@ export interface SprintOptions {
             path?: string;
         };
     };
+    /** Maximum file size (in bytes) for memory storage uploads. Default: 5MB (5 * 1024 * 1024) */
+    fileMemoryUploadedLimit?: number;
 }
 
 export interface SprintConfig {
@@ -148,6 +151,8 @@ export interface SprintConfig {
             path?: string;
         };
     };
+    /** Maximum file size (in bytes) for memory storage uploads. Default: 5MB (5 * 1024 * 1024) */
+    fileMemoryUploadedLimit?: number;
 }
 
 export type { NextFunction } from "express";

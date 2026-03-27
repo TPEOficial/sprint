@@ -1,6 +1,6 @@
 {
     "name": "sprint-es",
-    "version": "0.0.156",
+    "version": "0.0.165",
     "description": "Sprint - Quickly API",
     "main": "dist/cjs/index.js",
     "module": "dist/esm/index.js",
@@ -109,6 +109,7 @@
     "dependencies": {
         "@types/express": "^5.0.5",
         "axios": "^1.13.2",
+        "busboy": "^1.6.0",
         "cors": "^2.8.5",
         "dotenv": "^17.3.1",
         "express": "^5.1.0",
@@ -125,7 +126,9 @@
         "FJRG2007 (https://github.com/FJRG2007)"
     ],
     "devDependencies": {
+        "@types/busboy": "^1.5.4",
         "@types/cors": "^2.8.19",
+        "@types/dotenv": "^6.1.1",
         "@types/jest": "^30.0.0",
         "@types/morgan": "^1.9.10",
         "@types/node": "^22.18.7",

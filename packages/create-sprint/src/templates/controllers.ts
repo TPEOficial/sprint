@@ -99,3 +99,113 @@ export const jwtGenerateController = (req, res) => {
 `;
     }
 };
+
+export function getUploadController(language: string) {
+    if (language === "typescript") {
+        return `import { Handler, SprintRequest, SprintResponse } from "sprint-es";
+
+export const uploadPdfController: Handler = (req: SprintRequest, res: SprintResponse) => {
+    const file = req.file;
+    
+    if (!file) return res.status(400).json({ error: "No file uploaded" });
+    
+    res.json({
+        message: "PDF uploaded successfully",
+        file: {
+            name: file.originalname,
+            size: file.size,
+            type: file.mimetype
+        }
+    });
+};
+
+export const uploadMultiplePdfsController: Handler = (req: SprintRequest, res: SprintResponse) => {
+    const files = req.files?.documents || [];
+    
+    if (!files || files.length === 0) return res.status(400).json({ error: "No files uploaded" });
+    
+    res.json({
+        message: \`\${files.length} PDFs uploaded successfully\`,
+        files: files.map((f) => ({
+            name: f.originalname,
+            size: f.size,
+            type: f.mimetype
+        }))
+    });
+};
+
+export const streamUploadController: Handler = (req: SprintRequest, res: SprintResponse) => {
+    const files = (req as any).files?.file || [];
+    
+    if (!files || files.length === 0) return res.status(400).json({ error: "No files uploaded" });
+    
+    res.json({
+        message: \`\${files.length} file(s) processed via streaming\`,
+        files: files.map((f: any) => ({
+            fieldName: f.fieldname,
+            filename: f.originalname,
+            mimeType: f.mimetype,
+            encoding: f.encoding
+        }))
+    });
+};
+`;
+    }
+    return `export const uploadPdfController = (req, res) => {
+    const file = req.file;
+    
+    if (!file) return res.status(400).json({ error: "No file uploaded" });
+    
+    res.json({
+        message: "PDF uploaded successfully",
+        file: {
+            name: file.originalname,
+            size: file.size,
+            type: file.mimetype
+        }
+    });
+};
+
+export const uploadMultiplePdfsController = (req, res) => {
+    const files = req.files?.documents || [];
+    
+    if (!files || files.length === 0) return res.status(400).json({ error: "No files uploaded" });
+    
+    res.json({
+        message: \`\${files.length} PDFs uploaded successfully\`,
+        files: files.map((f) => ({
+            name: f.originalname,
+            size: f.size,
+            type: f.mimetype
+        }))
+    });
+};
+
+export const streamUploadController = async (req, res, next) => {
+    const sprint = req.sprintInstance;
+    
+    if (!sprint) return res.status(500).json({ error: "Sprint instance not available" });
+    
+    try {
+        const streamParser = sprint.streamUpload({
+            limits: { fileSize: 10 * 1024 * 1024 }
+        });
+        
+        const { files, fields } = await streamParser(req, res);
+        
+        res.json({
+            message: \`\${files.length} file(s) processed via streaming\`,
+            files: files.map((f) => ({
+                fieldName: f.fieldName,
+                filename: f.filename,
+                mimeType: f.mimeType,
+                encoding: f.encoding
+            })),
+            fields
+        });
+    } catch (error) {
+        return res.status(400).json({ error: "Stream upload failed", details: error });
+    }
+};
+`;
+}

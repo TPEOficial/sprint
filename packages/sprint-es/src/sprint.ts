@@ -4,12 +4,14 @@ import cors from "cors";
 import path from "path";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import multer from "multer";
+import busboy from "busboy";
 import { pathToFileURL } from "url";
 import { RateLimiter } from "toolkitify/rate-limit";
-import { isVerbose, matchesPatterns, stripRouteGroups, deepMerge } from "./utils";
-import { Handler, SprintOptions, SprintConfig, MiddlewareConfig, LoadedMiddleware, MiddlewareSchema } from "./types";
-import express, { Application, RequestHandler, Router as ExpressRouter, Request } from "express";
 import { AuthorizationSource, SprintRequest } from "./types";
+import { isVerbose, matchesPatterns, stripRouteGroups, deepMerge } from "./utils";
+import express, { Application, RequestHandler, Router as ExpressRouter, Request, Response } from "express";
+import { Handler, SprintOptions, SprintConfig, MiddlewareConfig, LoadedMiddleware, MiddlewareSchema } from "./types";
 
 const nodeEnv = process.env.NODE_ENV?.toLowerCase();
 const isDev = nodeEnv === "development";
@@ -29,12 +31,9 @@ export const isProduction = isProd;
 function isEnabledInEnv(value: boolean | string[] | undefined): boolean {
     if (value === undefined) return false;
     if (typeof value === "boolean") return value;
-    if (Array.isArray(value)) {
-        const env = nodeEnv || "development";
-        return value.includes(env);
-    }
+    if (Array.isArray(value)) return value.includes(nodeEnv || "development");
     return false;
-}
+};
 
 async function findProjectRoot(startDir: string): Promise<string | null> {
     let currentDir = startDir;
@@ -118,6 +117,8 @@ export class Sprint {
         path: string;
         schema: any;
     }> = [];
+    public fileMemoryUploadedLimit: number = 5 * 1024 * 1024; // 5MB default.
+    public memoryUpload: any;
 
     constructor() {
         this.app = express();
@@ -171,6 +172,7 @@ export class Sprint {
                     path: finalConfig.graphql?.graphiql?.path || "/graphiql"
                 }
             };
+            this.fileMemoryUploadedLimit = finalConfig.fileMemoryUploadedLimit || 5 * 1024 * 1024;
 
             const openApiPath = this.openapi.path;
             const swaggerPath = this.openapi.swaggerUi.path;
@@ -201,6 +203,11 @@ export class Sprint {
             this.loadDefaults();
             this.loadHealthcheck();
             this.routesLoaded = this.init();
+
+            this.memoryUpload = multer({
+                storage: multer.memoryStorage(),
+                limits: { fileSize: this.fileMemoryUploadedLimit }
+            });
 
             this.routesLoaded.then(async () => {
                 if (this.openapi.generateOnBuild) {
@@ -290,7 +297,7 @@ export class Sprint {
 
         const resolve = (p: string) => path.isAbsolute(p) ? p : path.join(baseDir, p);
 
-        // Middlewares
+        // Middlewares.
         try {
             const fullPath = resolve(middlewaresCandidate);
             if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) await this.loadMiddlewares(fullPath);
@@ -299,7 +306,7 @@ export class Sprint {
             console.error("[Sprint] Failed to load middlewares:", err);
         }
 
-        // Routes
+        // Routes.
         try {
             const fullPath = resolve(routesCandidate);
             if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) await this.loadRoutes(fullPath);
@@ -368,7 +375,7 @@ export class Sprint {
     };
 
     /**
-     * Gets all matching middlewares for a given route path, sorted by priority
+     * Gets all matching middlewares for a given route path, sorted by priority.
      */
     private getMiddlewaresForRoute(routePath: string): RequestHandler[] {
         const matched: { handler: RequestHandler; priority: number; name: string; }[] = [];
@@ -392,14 +399,14 @@ export class Sprint {
             }
         }
 
-        // Sort by priority (lower first)
+        // Sort by priority (lower first).
         matched.sort((a, b) => a.priority - b.priority);
 
         return matched.map(m => m.handler);
     };
 
     /**
-     * Load all middleware files from the middlewares folder
+     * Load all middleware files from the middlewares folder.
      */
     private async loadMiddlewares(middlewaresPath: string): Promise<void> {
         const fileExtensions = isProd ? [".mjs", ".js"] : [".ts"];
@@ -436,9 +443,7 @@ export class Sprint {
     };
 
     private loadHealthcheck(): void {
-        const healthRoutes = this.prefix
-            ? [`${this.prefix}/health`, `${this.prefix}/healthcheck`]
-            : ["/health", "/healthcheck"];
+        const healthRoutes = this.prefix ? [`${this.prefix}/health`, `${this.prefix}/healthcheck`] : ["/health", "/healthcheck"];
 
         this.app.get(healthRoutes, (_, res) => {
             const healthcheckXml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -516,11 +521,46 @@ export class Sprint {
                             // Get matching middlewares for this route (match against path without prefix for middleware patterns).
                             const routeMiddlewares = this.getMiddlewaresForRoute(routePath);
 
+                            // Find file upload middleware from schema
+                            let fileUploadMiddleware: any = null;
+                            for (const layer of router.stack) {
+                                if (!layer.route) continue;
+                                for (const routeLayer of layer.route.stack) {
+                                    const handlers = Array.isArray(routeLayer.handle) ? routeLayer.handle : [routeLayer.handle];
+                                    
+                                    for (const handler of handlers) {
+                                        const handlerSchema = (handler as any).__sprintRouteSchema;
+                                        if (handlerSchema?.files && typeof handlerSchema.files === "object" && !Array.isArray(handlerSchema.files)) {
+                                            const fileFields = Object.keys(handlerSchema.files);
+                                            const hasStreaming = handler?.hasStreamingFiles ? handler.hasStreamingFiles() : false;
+                                            
+                                            if (hasStreaming) {
+                                                fileUploadMiddleware = this.streamUpload();
+                                                break;
+                                            } else if (fileFields.length > 0) {
+                                                fileUploadMiddleware = this.uploadFiles(fileFields);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if (fileUploadMiddleware) break;
+                                }
+                                if (fileUploadMiddleware) break;
+                            }
+
                             if (routeMiddlewares.length > 0) {
-                                this.app.use(finalRoute, ...routeMiddlewares, router);
+                                if (fileUploadMiddleware) {
+                                    this.app.use(finalRoute, fileUploadMiddleware, ...routeMiddlewares, router);
+                                } else {
+                                    this.app.use(finalRoute, ...routeMiddlewares, router);
+                                }
                                 if (isVerbose) console.log(`[Sprint] Loaded route: ${finalRoute} -> ${filePath} (with ${routeMiddlewares.length} middleware(s))`);
                             } else {
-                                this.app.use(finalRoute, router);
+                                if (fileUploadMiddleware) {
+                                    this.app.use(finalRoute, fileUploadMiddleware, router);
+                                } else {
+                                    this.app.use(finalRoute, router);
+                                }
                                 if (isVerbose) console.log(`[Sprint] Loaded route: ${finalRoute} -> ${filePath}`);
                             }
                             this.counters.routes += router.stack.length;
@@ -631,7 +671,7 @@ export class Sprint {
                 }
             }
 
-            // Add query params schema if defined
+            // Add query params schema if defined.
             if (route.schema?.queryParams) {
                 try {
                     const params = this.zodParamsToOpenAPI(route.schema.queryParams);
@@ -641,7 +681,7 @@ export class Sprint {
                 }
             }
 
-            // Add headers schema if defined
+            // Add headers schema if defined.
             if (route.schema?.headers) {
                 try {
                     const headers = this.zodHeadersToOpenAPI(route.schema.headers);
@@ -651,7 +691,7 @@ export class Sprint {
                 }
             }
 
-            // Add route sprint.authorization if defined
+            // Add route sprint.authorization if defined.
             if (route.schema?.sprint?.authorization) {
                 const authSchema = route.schema.sprint.authorization;
                 const description = authSchema._def?.description;
@@ -686,7 +726,7 @@ export class Sprint {
                 }
             }
 
-            // Add middleware schemas for this route
+            // Add middleware schemas for this route.
             if (this.openapi.generateOnBuild) {
                 try {
                     const routeMiddlewares = this.getMiddlewaresForRoute(route.path);
@@ -796,7 +836,7 @@ export class Sprint {
 
                 properties[key] = propSchema;
 
-                // Check if required (not optional)
+                // Check if required (not optional).
                 if (!zodDef?.isOptional && typeName !== "ZodOptional") required.push(key);
             }
 
@@ -950,5 +990,60 @@ export class Sprint {
 
         tryListen(basePort);
         if (callback) callback();
+    };
+
+    public uploadFile(fieldName: string = "file") {
+        return this.memoryUpload.single(fieldName);
+    };
+
+    public uploadFiles(fieldNames: string | string[] = "files") {
+        if (Array.isArray(fieldNames)) return this.memoryUpload.fields(fieldNames.map(name => ({ name })));
+        return this.memoryUpload.array(fieldNames);
+    };
+
+    public streamUpload(options?: {
+        limits?: {
+            fileSize?: number;
+            files?: number;
+        };
+        headers?: Record<string, string>;
+    }) {
+        return (req: Request, res: Response, next: (err?: any) => void): void => {
+            const bb = busboy({
+                headers: req.headers,
+                limits: options?.limits
+            });
+
+            const files: { [fieldname: string]: any[] } = {};
+
+            bb.on("file", (fieldName: string, file: NodeJS.ReadableStream, info: busboy.FileInfo) => {
+                if (!files[fieldName]) files[fieldName] = [];
+                files[fieldName].push({
+                    fieldname: fieldName,
+                    originalname: info.filename,
+                    encoding: info.encoding,
+                    mimetype: info.mimeType,
+                    size: 0,
+                    buffer: undefined,
+                    file
+                });
+            });
+
+            bb.on("field", (fieldName: string, val: string) => {
+                if (!req.body) req.body = {};
+                req.body[fieldName] = val;
+            });
+
+            bb.on("finish", () => {
+                (req as any).files = files;
+                next();
+            });
+
+            bb.on("error", (err: Error) => {
+                next(err);
+            });
+
+            req.pipe(bb);
+        };
     };
 };
