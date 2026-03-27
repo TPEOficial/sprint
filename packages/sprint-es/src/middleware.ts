@@ -1,5 +1,5 @@
 import { RequestHandler } from "express";
-import { z, normalizeHeadersSchema } from "./modules/schemas";
+import { normalizeHeadersSchema } from "./modules/schemas";
 import { MiddlewareConfig, AsyncRequestHandler, MiddlewareSchema } from "./types";
 
 function createSchemaValidationMiddleware(schema: MiddlewareSchema): RequestHandler {

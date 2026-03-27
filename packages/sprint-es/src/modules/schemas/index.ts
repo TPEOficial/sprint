@@ -255,11 +255,13 @@ export function defineRouteSchema<T extends RouteSchemaOptions>(schema: T): Requ
             for (const [fieldName, fieldSchema] of Object.entries(schema.files)) {
                 const fieldFiles = (req as any).files?.[fieldName] || [];
                 const filesArray = Array.isArray(fieldFiles) ? fieldFiles : [fieldFiles];
-                
+
                 const isOptional = (fieldSchema as any).isOptional ? (fieldSchema as any).isOptional() : false;
-                
-                if (filesArray.length > 0 || isOptional) {
-                    const result = parseSchema(fieldSchema, filesArray);
+
+                if (filesArray.length === 0 && isOptional) continue;
+
+                for (const file of filesArray) {
+                    const result = parseSchema(fieldSchema, file);
                     if (!result.success) errors.push(...result.errors.map(e => ({ location: "files", path: fieldName, message: `${e.path || fieldName}: ${e.message}` })));
                 }
             }

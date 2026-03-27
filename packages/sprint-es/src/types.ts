@@ -1,20 +1,18 @@
 import { Request, Response, NextFunction, RequestHandler } from "express";
-import { ZodSchema } from "./modules/schemas/types";
-import { Sprint } from "./sprint";
+import { ZodSchema, FileObject } from "./modules/schemas/types";
 
 export type AsyncRequestHandler = (req: SprintRequest, res: SprintResponse, next: NextFunction) => Promise<any>;
 export type Handler = (req: SprintRequest, res: SprintResponse, next: NextFunction) => any;
 
-export type AuthorizationSource = 
-    | `query:${string}` 
-    | `headers:${string}`;
+export type AuthorizationSource = `query:${string}` | `headers:${string}`;
 
-export type SprintRequest = Request & {
+export type SprintRequest = Omit<Request, "file" | "files"> & {
     sprint: {
         getAuthorization: (sources?: AuthorizationSource | AuthorizationSource[]) => string | undefined;
         authorization?: string;
     };
     custom: any;
+    files?: { [fieldname: string]: FileObject[]; };
 }
 
 export type SprintResponse = Response;
@@ -28,6 +26,12 @@ declare global {
             };
             custom: any;
         }
+    }
+}
+
+declare module "express-serve-static-core" {
+    interface Request {
+        files?: { [fieldname: string]: FileObject[]; };
     }
 }
 

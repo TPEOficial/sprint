@@ -1,7 +1,7 @@
 import { Handler, SprintRequest, SprintResponse } from "sprint-es";
 
 export const uploadPdfController: Handler = (req: SprintRequest, res: SprintResponse) => {
-    const file = req.file;
+    const file = req.files?.document[0];
     
     if (!file) return res.status(400).json({ error: "No file uploaded" });
     

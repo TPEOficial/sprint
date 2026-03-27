@@ -1014,7 +1014,7 @@ export class Sprint {
                 limits: options?.limits
             });
 
-            const files: { [fieldname: string]: any[] } = {};
+            const files: { [fieldname: string]: any[]; } = {};
 
             bb.on("file", (fieldName: string, file: NodeJS.ReadableStream, info: busboy.FileInfo) => {
                 if (!files[fieldName]) files[fieldName] = [];
