@@ -1,0 +1,22 @@
+{
+    "name": "sprint-grpc-example",
+    "version": "0.0.1",
+    "description": "Sprint API + gRPC server (mixed HTTP+gRPC backend)",
+    "main": "dist/app.js",
+    "type": "module",
+    "scripts": {
+        "build": "sprint build",
+        "start": "sprint start",
+        "dev": "sprint dev"
+    },
+    "dependencies": {
+        "@grpc/grpc-js": "^1.12.0",
+        "sprint-es": "^1.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "tsup": "^8.5.1",
+        "tsx": "^4.19.0",
+        "typescript": "^5.6.0"
+    }
+}

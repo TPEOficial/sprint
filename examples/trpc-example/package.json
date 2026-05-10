@@ -1,0 +1,23 @@
+{
+    "name": "sprint-trpc-example",
+    "version": "0.0.1",
+    "description": "Sprint API + tRPC adapter",
+    "main": "dist/app.js",
+    "type": "module",
+    "scripts": {
+        "build": "sprint build",
+        "start": "sprint start",
+        "dev": "sprint dev"
+    },
+    "dependencies": {
+        "@trpc/server": "^11.0.0",
+        "sprint-es": "^1.0.0",
+        "zod": "^3.25.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "tsup": "^8.5.1",
+        "tsx": "^4.19.0",
+        "typescript": "^5.6.0"
+    }
+}

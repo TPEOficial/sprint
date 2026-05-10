@@ -1,5 +1,9 @@
 import { Request, Response, NextFunction, RequestHandler } from "express";
 import { ZodSchema, FileObject } from "./modules/schemas/types";
+import type { CorsOptions, SecurityHeadersOptions } from "./modules/security";
+import type { ContextMiddlewareOptions } from "./modules/context";
+import type { ErrorHandlerOptions } from "./modules/errors";
+import type { ShutdownOptions } from "./modules/lifecycle";
 
 export type AsyncRequestHandler = (req: SprintRequest, res: SprintResponse, next: NextFunction) => Promise<any>;
 export type Handler = (req: SprintRequest, res: SprintResponse, next: NextFunction) => any;
@@ -127,6 +131,21 @@ export interface SprintOptions {
     };
     /** Maximum file size (in bytes) for memory storage uploads. Default: 5MB (5 * 1024 * 1024) */
     fileMemoryUploadedLimit?: number;
+
+    /** CORS config. Default: no CORS (origin: false). Pass { origin: "*" } for permissive (no credentials). */
+    cors?: CorsOptions | false;
+    /** Security headers config. Pass false to disable, object to override. */
+    security?: SecurityHeadersOptions | false;
+    /** Request context (correlation ID, traceparent). Pass false to disable. */
+    context?: ContextMiddlewareOptions | false;
+    /** Global error handler config. Pass false to disable. */
+    errorHandler?: ErrorHandlerOptions | false;
+    /** Graceful shutdown config. Pass false to disable. */
+    shutdown?: ShutdownOptions | false;
+    /** Liveness probe path. Default: "/healthz". Pass false to disable. */
+    livenessPath?: string | false;
+    /** Readiness probe path. Default: "/readyz". Pass false to disable. */
+    readinessPath?: string | false;
 }
 
 export interface SprintConfig {
@@ -157,6 +176,14 @@ export interface SprintConfig {
     };
     /** Maximum file size (in bytes) for memory storage uploads. Default: 5MB (5 * 1024 * 1024) */
     fileMemoryUploadedLimit?: number;
+
+    cors?: CorsOptions | false;
+    security?: SecurityHeadersOptions | false;
+    context?: ContextMiddlewareOptions | false;
+    errorHandler?: ErrorHandlerOptions | false;
+    shutdown?: ShutdownOptions | false;
+    livenessPath?: string | false;
+    readinessPath?: string | false;
 }
 
 export type { NextFunction } from "express";

@@ -8,7 +8,8 @@ export function initTelemetry(config: TelemetryConfig): void {
 
     if (config.provider === "sentry" || config.provider === "glitchtip") {
         if (config.dsn) {
-            import("@sentry/node").then((Sentry) => {
+            // @ts-ignore - optional peer dep
+import("@sentry/node").then((Sentry: any) => {
                 Sentry.init({
                     dsn: config.dsn,
                     environment: config.environment || process.env.NODE_ENV || "development",
@@ -33,7 +34,8 @@ export function captureError(error: Error, context?: Record<string, unknown>): v
 
     if (currentConfig.provider === "sentry" || currentConfig.provider === "glitchtip") {
         if (sentryInitialized) {
-            import("@sentry/node").then((Sentry) => {
+            // @ts-ignore - optional peer dep
+import("@sentry/node").then((Sentry: any) => {
                 Sentry.captureException(error, {
                     extra: context,
                 });
@@ -53,7 +55,8 @@ export function captureMessage(message: string, level: "info" | "warning" | "err
 
     if (currentConfig.provider === "sentry" || currentConfig.provider === "glitchtip") {
         if (sentryInitialized) {
-            import("@sentry/node").then((Sentry) => {
+            // @ts-ignore - optional peer dep
+import("@sentry/node").then((Sentry: any) => {
                 Sentry.captureMessage(message, level, {
                     extra: context,
                 });
@@ -69,7 +72,8 @@ export function setUser(user: { id: string; email?: string; username?: string })
 
     if (currentConfig.provider === "sentry" || currentConfig.provider === "glitchtip") {
         if (sentryInitialized) {
-            import("@sentry/node").then((Sentry) => {
+            // @ts-ignore - optional peer dep
+import("@sentry/node").then((Sentry: any) => {
                 Sentry.setUser(user);
             }).catch(() => {});
         }

@@ -1,0 +1,23 @@
+{
+    "name": "sprint-websocket-example",
+    "version": "0.0.1",
+    "description": "Sprint API + WebSocket (chat broadcast room)",
+    "main": "dist/app.js",
+    "type": "module",
+    "scripts": {
+        "build": "sprint build",
+        "start": "sprint start",
+        "dev": "sprint dev"
+    },
+    "dependencies": {
+        "sprint-es": "^1.0.0",
+        "ws": "^8.18.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "@types/ws": "^8.5.10",
+        "tsup": "^8.5.1",
+        "tsx": "^4.19.0",
+        "typescript": "^5.6.0"
+    }
+}

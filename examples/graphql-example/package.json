@@ -1,0 +1,24 @@
+{
+    "name": "sprint-graphql-example",
+    "version": "0.0.1",
+    "description": "Sprint API + GraphQL (graphql-http + ruru playground)",
+    "main": "dist/app.js",
+    "type": "module",
+    "scripts": {
+        "build": "sprint build",
+        "start": "sprint start",
+        "dev": "sprint dev"
+    },
+    "dependencies": {
+        "graphql": "^16.13.0",
+        "graphql-http": "^1.22.4",
+        "ruru": "^2.0.0-rc.6",
+        "sprint-es": "^1.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "tsup": "^8.5.1",
+        "tsx": "^4.19.0",
+        "typescript": "^5.6.0"
+    }
+}

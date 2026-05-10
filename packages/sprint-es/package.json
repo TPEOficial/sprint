@@ -1,6 +1,6 @@
 {
     "name": "sprint-es",
-    "version": "0.0.168",
+    "version": "1.0.0",
     "description": "Sprint - Quickly API",
     "main": "dist/cjs/index.js",
     "module": "dist/esm/index.js",
@@ -50,6 +50,121 @@
             "types": "./dist/types/modules/utils/index.d.ts",
             "require": "./dist/cjs/modules/utils/index.cjs",
             "import": "./dist/esm/modules/utils/index.js"
+        },
+        "./errors": {
+            "types": "./dist/types/modules/errors/index.d.ts",
+            "require": "./dist/cjs/modules/errors/index.cjs",
+            "import": "./dist/esm/modules/errors/index.js"
+        },
+        "./context": {
+            "types": "./dist/types/modules/context/index.d.ts",
+            "require": "./dist/cjs/modules/context/index.cjs",
+            "import": "./dist/esm/modules/context/index.js"
+        },
+        "./lifecycle": {
+            "types": "./dist/types/modules/lifecycle/index.d.ts",
+            "require": "./dist/cjs/modules/lifecycle/index.cjs",
+            "import": "./dist/esm/modules/lifecycle/index.js"
+        },
+        "./security": {
+            "types": "./dist/types/modules/security/index.d.ts",
+            "require": "./dist/cjs/modules/security/index.cjs",
+            "import": "./dist/esm/modules/security/index.js"
+        },
+        "./cache": {
+            "types": "./dist/types/modules/cache/index.d.ts",
+            "require": "./dist/cjs/modules/cache/index.cjs",
+            "import": "./dist/esm/modules/cache/index.js"
+        },
+        "./db": {
+            "types": "./dist/types/modules/db/index.d.ts",
+            "require": "./dist/cjs/modules/db/index.cjs",
+            "import": "./dist/esm/modules/db/index.js"
+        },
+        "./queue": {
+            "types": "./dist/types/modules/queue/index.d.ts",
+            "require": "./dist/cjs/modules/queue/index.cjs",
+            "import": "./dist/esm/modules/queue/index.js"
+        },
+        "./env": {
+            "types": "./dist/types/modules/env/index.d.ts",
+            "require": "./dist/cjs/modules/env/index.cjs",
+            "import": "./dist/esm/modules/env/index.js"
+        },
+        "./body-parser": {
+            "types": "./dist/types/modules/body-parser/index.d.ts",
+            "require": "./dist/cjs/modules/body-parser/index.cjs",
+            "import": "./dist/esm/modules/body-parser/index.js"
+        },
+        "./sse": {
+            "types": "./dist/types/modules/sse/index.d.ts",
+            "require": "./dist/cjs/modules/sse/index.cjs",
+            "import": "./dist/esm/modules/sse/index.js"
+        },
+        "./ws": {
+            "types": "./dist/types/modules/ws/index.d.ts",
+            "require": "./dist/cjs/modules/ws/index.cjs",
+            "import": "./dist/esm/modules/ws/index.js"
+        },
+        "./workers": {
+            "types": "./dist/types/modules/workers/index.d.ts",
+            "require": "./dist/cjs/modules/workers/index.cjs",
+            "import": "./dist/esm/modules/workers/index.js"
+        },
+        "./csrf": {
+            "types": "./dist/types/modules/csrf/index.d.ts",
+            "require": "./dist/cjs/modules/csrf/index.cjs",
+            "import": "./dist/esm/modules/csrf/index.js"
+        },
+        "./idempotency": {
+            "types": "./dist/types/modules/idempotency/index.d.ts",
+            "require": "./dist/cjs/modules/idempotency/index.cjs",
+            "import": "./dist/esm/modules/idempotency/index.js"
+        },
+        "./circuit-breaker": {
+            "types": "./dist/types/modules/circuit-breaker/index.d.ts",
+            "require": "./dist/cjs/modules/circuit-breaker/index.cjs",
+            "import": "./dist/esm/modules/circuit-breaker/index.js"
+        },
+        "./discovery": {
+            "types": "./dist/types/modules/discovery/index.d.ts",
+            "require": "./dist/cjs/modules/discovery/index.cjs",
+            "import": "./dist/esm/modules/discovery/index.js"
+        },
+        "./flags": {
+            "types": "./dist/types/modules/flags/index.d.ts",
+            "require": "./dist/cjs/modules/flags/index.cjs",
+            "import": "./dist/esm/modules/flags/index.js"
+        },
+        "./trpc": {
+            "types": "./dist/types/modules/trpc/index.d.ts",
+            "require": "./dist/cjs/modules/trpc/index.cjs",
+            "import": "./dist/esm/modules/trpc/index.js"
+        },
+        "./grpc": {
+            "types": "./dist/types/modules/grpc/index.d.ts",
+            "require": "./dist/cjs/modules/grpc/index.cjs",
+            "import": "./dist/esm/modules/grpc/index.js"
+        },
+        "./http-client": {
+            "types": "./dist/types/modules/http-client/index.d.ts",
+            "require": "./dist/cjs/modules/http-client/index.cjs",
+            "import": "./dist/esm/modules/http-client/index.js"
+        },
+        "./pagination": {
+            "types": "./dist/types/modules/pagination/index.d.ts",
+            "require": "./dist/cjs/modules/pagination/index.cjs",
+            "import": "./dist/esm/modules/pagination/index.js"
+        },
+        "./secrets": {
+            "types": "./dist/types/modules/secrets/index.d.ts",
+            "require": "./dist/cjs/modules/secrets/index.cjs",
+            "import": "./dist/esm/modules/secrets/index.js"
+        },
+        "./openapi": {
+            "types": "./dist/types/modules/openapi/index.d.ts",
+            "require": "./dist/cjs/modules/openapi/index.cjs",
+            "import": "./dist/esm/modules/openapi/index.js"
         }
     },
     "typesVersions": {
@@ -74,6 +189,75 @@
             ],
             "utils": [
                 "dist/types/modules/utils/index.d.ts"
+            ],
+            "errors": [
+                "dist/types/modules/errors/index.d.ts"
+            ],
+            "context": [
+                "dist/types/modules/context/index.d.ts"
+            ],
+            "lifecycle": [
+                "dist/types/modules/lifecycle/index.d.ts"
+            ],
+            "security": [
+                "dist/types/modules/security/index.d.ts"
+            ],
+            "cache": [
+                "dist/types/modules/cache/index.d.ts"
+            ],
+            "db": [
+                "dist/types/modules/db/index.d.ts"
+            ],
+            "queue": [
+                "dist/types/modules/queue/index.d.ts"
+            ],
+            "env": [
+                "dist/types/modules/env/index.d.ts"
+            ],
+            "body-parser": [
+                "dist/types/modules/body-parser/index.d.ts"
+            ],
+            "sse": [
+                "dist/types/modules/sse/index.d.ts"
+            ],
+            "ws": [
+                "dist/types/modules/ws/index.d.ts"
+            ],
+            "workers": [
+                "dist/types/modules/workers/index.d.ts"
+            ],
+            "csrf": [
+                "dist/types/modules/csrf/index.d.ts"
+            ],
+            "idempotency": [
+                "dist/types/modules/idempotency/index.d.ts"
+            ],
+            "circuit-breaker": [
+                "dist/types/modules/circuit-breaker/index.d.ts"
+            ],
+            "discovery": [
+                "dist/types/modules/discovery/index.d.ts"
+            ],
+            "flags": [
+                "dist/types/modules/flags/index.d.ts"
+            ],
+            "trpc": [
+                "dist/types/modules/trpc/index.d.ts"
+            ],
+            "grpc": [
+                "dist/types/modules/grpc/index.d.ts"
+            ],
+            "http-client": [
+                "dist/types/modules/http-client/index.d.ts"
+            ],
+            "pagination": [
+                "dist/types/modules/pagination/index.d.ts"
+            ],
+            "secrets": [
+                "dist/types/modules/secrets/index.d.ts"
+            ],
+            "openapi": [
+                "dist/types/modules/openapi/index.d.ts"
             ]
         }
     },
@@ -110,7 +294,6 @@
         "@types/express": "^5.0.5",
         "axios": "^1.13.2",
         "busboy": "^1.6.0",
-        "cors": "^2.8.5",
         "dotenv": "^17.3.1",
         "express": "^5.1.0",
         "morgan": "^1.10.1",
@@ -148,6 +331,30 @@
         "graphql-http": "^1.22.4",
         "ruru": "^2.0.0-rc.6",
         "swagger-ui-express": "^5.0.1"
+    },
+    "peerDependencies": {
+        "bullmq": "^5.0.0",
+        "ioredis": "^5.0.0",
+        "ws": "^8.0.0",
+        "@trpc/server": "^10.0.0 || ^11.0.0",
+        "@grpc/grpc-js": "^1.9.0"
+    },
+    "peerDependenciesMeta": {
+        "bullmq": {
+            "optional": true
+        },
+        "ioredis": {
+            "optional": true
+        },
+        "ws": {
+            "optional": true
+        },
+        "@trpc/server": {
+            "optional": true
+        },
+        "@grpc/grpc-js": {
+            "optional": true
+        }
     },
     "prettier": {
         "tabWidth": 4,

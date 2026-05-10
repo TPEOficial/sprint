@@ -1,3 +1,5 @@
+import type { ProjectFeatures } from "../index.js";
+
 export function getTsConfig() {
     return `
 {
@@ -28,16 +30,61 @@ export function getTsConfig() {
     `;
 };
 
-export function getSprintConfigFile(language: string, telemetry: string, swagger: boolean, graphql: boolean) {
+function buildCorsBlock(corsInput: string): string {
+    const trimmed = (corsInput ?? "").trim();
+    if (trimmed === "" || trimmed.toLowerCase() === "deny" || trimmed.toLowerCase() === "none") {
+        return `    cors: false,`;
+    }
+    if (trimmed === "*") {
+        return `    cors: { origin: "*" },`;
+    }
+    const origins = trimmed.split(",").map(o => o.trim()).filter(Boolean);
+    return `    cors: {
+        origin: ${JSON.stringify(origins)},
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allowedHeaders: ["Content-Type", "Authorization"]
+    },`;
+}
+
+export function getSprintConfigFile(
+    language: string,
+    telemetry: string,
+    swagger: boolean,
+    graphql: boolean,
+    features?: Partial<ProjectFeatures>
+): string {
+    const corsInput = features?.cors ?? "";
     const swaggerEnabled = swagger ? "true" : "false";
     const swaggerUiEnabled = swagger ? '["development"]' : "false";
     const graphqlEnabled = graphql ? "true" : "false";
     const graphiqlEnabled = graphql ? '["development"]' : "false";
-    
-    if (language === "typescript") {
-        let config = `import type { SprintOptions } from "sprint-es";
 
-export const config: SprintOptions = {
+    const corsBlock = buildCorsBlock(corsInput);
+
+    const isTs = language === "typescript";
+    const importLine = isTs ? `import type { SprintOptions } from "sprint-es";\n\n` : "";
+    const exportLine = isTs ? `export const config: SprintOptions = {` : `export const config = {`;
+
+    let config = `${importLine}${exportLine}
+${corsBlock}
+
+    security: {
+        hsts: { maxAge: 63072000, includeSubDomains: true }
+    },
+
+    context: {
+        trustIncomingRequestId: true
+    },
+
+    errorHandler: {
+        includeStack: process.env.NODE_ENV !== "production"
+    },
+
+    shutdown: {
+        timeoutMs: 30_000
+    },
+
     openapi: {
         enabled: ${swaggerEnabled},
         generateOnBuild: ${swaggerEnabled},
@@ -45,6 +92,7 @@ export const config: SprintOptions = {
             enabled: ${swaggerUiEnabled}
         }
     },
+
     graphql: {
         enabled: ${graphqlEnabled},
         graphiql: {
@@ -52,58 +100,10 @@ export const config: SprintOptions = {
         }
     }
 };
-
-// To use GraphQL, create a schema at src/graphql/schema.ts and import it here
-// import { GraphQLSchema } from "graphql";
-// export const graphqlSchema = new GraphQLSchema({ ... });
-`;
-
-        if (telemetry === "sentry" || telemetry === "glitchtip") {
-            config += `import { initTelemetry } from "sprint-es/telemetry";
-
-initTelemetry({
-    provider: "${telemetry}",
-    dsn: process.env.SENTRY_DSN || "",
-    environment: process.env.NODE_ENV || "development"
-});
-`;
-        } else if (telemetry === "discord") {
-            config += `import { initTelemetry } from "sprint-es/telemetry";
-
-initTelemetry({
-    provider: "discord",
-    webhookUrl: process.env.DISCORD_TELEMETRY_WEBHOOK_URL || ""
-});
-`;
-        }
-
-        return config;
-    }
-
-    let config = `export const config = {
-    openapi: {
-        enabled: ${swaggerEnabled},
-        generateOnBuild: ${swaggerEnabled},
-        swaggerUi: {
-            enabled: ${swaggerUiEnabled}
-        }
-    },
-    graphql: {
-        enabled: ${graphqlEnabled},
-        graphiql: {
-            enabled: ${graphiqlEnabled}
-        }
-    }
-};
-
-// To use GraphQL, create a schema at src/graphql/schema.js and import it here
-// import { GraphQLSchema } from "graphql";
-// export const graphqlSchema = new GraphQLSchema({ ... });
 `;
 
     if (telemetry === "sentry" || telemetry === "glitchtip") {
-        config += `
-import { initTelemetry } from "sprint-es/telemetry";
+        config += `\nimport { initTelemetry } from "sprint-es/telemetry";
 
 initTelemetry({
     provider: "${telemetry}",
@@ -112,8 +112,7 @@ initTelemetry({
 });
 `;
     } else if (telemetry === "discord") {
-        config += `
-import { initTelemetry } from "sprint-es/telemetry";
+        config += `\nimport { initTelemetry } from "sprint-es/telemetry";
 
 initTelemetry({
     provider: "discord",

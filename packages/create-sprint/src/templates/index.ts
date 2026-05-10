@@ -28,5 +28,8 @@ export { getDockerfile, getDockerCompose } from "./docker.js";
 // GraphQL
 export { getGraphQLFiles } from "./graphql.js";
 
+// Services (queue, cache, trpc, grpc, websocket scaffolds)
+export { getQueueService, getCacheService, getTrpcRouter, getGrpcServer, getWebSocketScaffold } from "./services.js";
+
 // Misc
 export { getGitignore, getDockerIgnore } from "./misc.js";

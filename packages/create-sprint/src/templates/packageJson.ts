@@ -1,4 +1,5 @@
 import * as crypto from "node:crypto";
+import type { ProjectFeatures } from "../index.js";
 
 export interface JWTKeys {
     publicKey: string;
@@ -14,9 +15,18 @@ export function generateJWTKeys(): JWTKeys {
     return keys;
 };
 
-export function getTypeScriptPackageJson(name: string, telemetry: string, swagger: boolean, graphql: boolean) {
+function applyFeatureDeps(deps: Record<string, string>, features?: Partial<ProjectFeatures>): void {
+    if (!features) return;
+    if (features.queue === "bullmq") deps["bullmq"] = "^5.0.0";
+    if (features.queue === "bullmq" || features.cache === "redis") deps["ioredis"] = "^5.0.0";
+    if (features.websocket) deps["ws"] = "^8.18.0";
+    if (features.trpc) deps["@trpc/server"] = "^11.0.0";
+    if (features.grpc) deps["@grpc/grpc-js"] = "^1.12.0";
+}
+
+export function getTypeScriptPackageJson(name: string, telemetry: string, swagger: boolean, graphql: boolean, features?: Partial<ProjectFeatures>) {
     const deps: Record<string, string> = {
-        "sprint-es": "^0.0.168"
+        "sprint-es": "^1.0.0"
     };
 
     const devDeps: Record<string, string> = {
@@ -40,6 +50,9 @@ export function getTypeScriptPackageJson(name: string, telemetry: string, swagge
         deps["ruru"] = "^2.0.0-rc.6";
         devDeps["@types/swagger-ui-express"] = "^4.1.8";
     }
+
+    applyFeatureDeps(deps, features);
+    if (features?.websocket) devDeps["@types/ws"] = "^8.5.10";
 
     return {
         name: name === "." ? "sprint-app" : name,
@@ -74,14 +87,14 @@ export function getTypeScriptPackageJson(name: string, telemetry: string, swagge
     };
 };
 
-export function getJavaScriptPackageJson(name: string, telemetry: string, swagger: boolean, graphql: boolean) {
+export function getJavaScriptPackageJson(name: string, telemetry: string, swagger: boolean, graphql: boolean, features?: Partial<ProjectFeatures>) {
     const deps: Record<string, string> = {
-        "sprint-es": "^0.0.168"
+        "sprint-es": "^1.0.0"
     };
 
     if (telemetry === "sentry" || telemetry === "glitchtip") deps["@sentry/node"] = "^8.0.0";
     else if (telemetry === "discord") deps["axios"] = "^1.6.0";
-    
+
     if (swagger) deps["swagger-ui-express"] = "^5.0.0";
 
     if (graphql) {
@@ -89,6 +102,8 @@ export function getJavaScriptPackageJson(name: string, telemetry: string, swagge
         deps["graphql-http"] = "^1.22.4";
         deps["ruru"] = "^2.0.0-rc.6";
     }
+
+    applyFeatureDeps(deps, features);
 
     return {
         name: name === "." ? "sprint-app" : name,

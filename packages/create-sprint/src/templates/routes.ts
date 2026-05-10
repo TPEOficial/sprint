@@ -1,34 +1,57 @@
-export function getMainFile(language: string, graphql: boolean = false) {
+export interface MainFileFeatures {
+    queue?: "none" | "memory" | "bullmq";
+    cache?: "none" | "memory" | "redis";
+    websocket?: boolean;
+    trpc?: boolean;
+    grpc?: boolean;
+    csrf?: boolean;
+}
+
+export function getMainFile(language: string, graphql: boolean = false, features?: MainFileFeatures): string {
     const isTs = language === "typescript";
-    
-    if (isTs) {
-        if (graphql) {
-            return `import Sprint from "sprint-es";
-import { graphqlSchema } from "./graphql/schema";
+    const ext = isTs ? "" : ".js";
 
-const app = new Sprint();
-app.setGraphQLSchema(graphqlSchema);
-`;
-        }
-        return `import Sprint from "sprint-es";
-
-const app = new Sprint();
-`;
-    }
+    const imports: string[] = [`import Sprint from "sprint-es";`];
+    const setup: string[] = [`const app = new Sprint();`];
 
     if (graphql) {
-        return `import Sprint from "sprint-es";
-import { graphqlSchema } from "./graphql/schema.js";
-
-const app = new Sprint();
-app.setGraphQLSchema(graphqlSchema);
-`;
+        imports.push(`import { graphqlSchema } from "./graphql/schema${ext}";`);
+        setup.push(`app.setGraphQLSchema(graphqlSchema);`);
     }
 
-    return `import Sprint from "sprint-es";
+    if (features?.queue && features.queue !== "none") {
+        imports.push(`import "./services/queue${ext}";`);
+    }
+    if (features?.cache && features.cache !== "none") {
+        imports.push(`import "./services/cache${ext}";`);
+    }
 
-const app = new Sprint();
-`;
+    if (features?.csrf) {
+        // CSRF is registered via defineMiddleware in src/middlewares/csrf.ts; just hint here
+    }
+
+    if (features?.trpc) {
+        imports.push(`import { attachTrpc } from "sprint-es/trpc";`);
+        imports.push(`import { appRouter } from "./trpc/router${ext}";`);
+        setup.push(`await app.ready;`);
+        setup.push(`await attachTrpc({ app: app.app, router: appRouter });`);
+    }
+
+    if (features?.websocket) {
+        imports.push(`import { attachWebSocket } from "sprint-es/ws";`);
+        imports.push(`import { chatHandler } from "./ws/chat${ext}";`);
+        setup.push(`{
+    const server = await app.onListen();
+    await attachWebSocket({ server, handlers: { "/ws/chat": chatHandler } });
+}`);
+    }
+
+    if (features?.grpc) {
+        imports.push(`import { startGrpcServer } from "./grpc/server${ext}";`);
+        setup.push(`startGrpcServer().catch(err => console.error("[grpc] failed to start", err));`);
+    }
+
+    return imports.join("\n") + "\n\n" + setup.join("\n") + "\n";
 };
 
 export function getHomeRoute(language: string) {

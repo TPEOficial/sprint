@@ -1,6 +1,5 @@
 import fs from "fs";
 import http from "http";
-import cors from "cors";
 import path from "path";
 import morgan from "morgan";
 import dotenv from "dotenv";
@@ -12,6 +11,11 @@ import { AuthorizationSource, SprintRequest } from "./types";
 import { isVerbose, matchesPatterns, stripRouteGroups, deepMerge } from "./utils";
 import express, { Application, RequestHandler, Router as ExpressRouter, Request, Response } from "express";
 import { Handler, SprintOptions, SprintConfig, MiddlewareConfig, LoadedMiddleware, MiddlewareSchema } from "./types";
+import { createContextMiddleware } from "./modules/context";
+import { createErrorHandler, NotFoundError } from "./modules/errors";
+import { createCorsMiddleware, createSecurityHeadersMiddleware } from "./modules/security";
+import { bindShutdownSignals, initResources, checkReadiness, isShuttingDown } from "./modules/lifecycle";
+import { zodToOpenAPI, zodObjectToParams } from "./modules/openapi";
 
 const nodeEnv = process.env.NODE_ENV?.toLowerCase();
 const isDev = nodeEnv === "development";
@@ -70,15 +74,25 @@ async function loadSprintConfig(): Promise<SprintConfig | null> {
 
 export class Sprint {
     public app: Application;
+    /** Underlying http.Server. Available after `ready` resolves. */
+    public server: http.Server | undefined;
+    /**
+     * Resolves once config, middlewares, routes and cronjobs are loaded
+     * and the HTTP server is listening (when autoListen is true).
+     * Await this before attaching WebSocket / gRPC / extra protocols.
+     */
+    public ready: Promise<void>;
+    private resolveReady!: () => void;
+    private rejectReady!: (err: Error) => void;
+    private listeningResolvers: Array<(server: http.Server) => void> = [];
     private port: string | number | null | undefined = process.env.PORT;
     private routesPath: string = "./routes";
     private middlewaresPath: string = "./middlewares";
     private cronjobsPath: string = "./cronjobs";
-    private jsonLimit: string = "50mb";
-    private urlEncodedLimit: string = "50mb";
+    private jsonLimit: string = "1mb";
+    private urlEncodedLimit: string = "1mb";
     private prefix: string = "";
     private routesLoaded!: Promise<void>;
-    private server!: http.Server;
     private loadedMiddlewares: LoadedMiddleware<MiddlewareSchema>[] = [];
     private counters = { routes: 0, middlewares: 0, cronjobs: 0 };
     private openapi: {
@@ -119,9 +133,20 @@ export class Sprint {
     }> = [];
     public fileMemoryUploadedLimit: number = 5 * 1024 * 1024; // 5MB default.
     public memoryUpload: any;
+    private corsConfig: any = false;
+    private securityConfig: any = {};
+    private contextConfig: any = {};
+    private errorHandlerConfig: any = {};
+    private shutdownConfig: any = {};
+    private livenessPath: string | false = "/healthz";
+    private readinessPath: string | false = "/readyz";
 
     constructor() {
         this.app = express();
+        this.ready = new Promise<void>((resolve, reject) => {
+            this.resolveReady = resolve;
+            this.rejectReady = reject;
+        });
 
         loadSprintConfig().then((config) => {
             const defaults: SprintOptions = {
@@ -129,8 +154,8 @@ export class Sprint {
                 routesPath: isProd ? "./dist/routes" : "./src/routes",
                 middlewaresPath: isProd ? "./dist/middlewares" : "./src/middlewares",
                 cronjobsPath: isProd ? "./dist/cronjobs" : "./src/cronjobs",
-                jsonLimit: "50mb",
-                urlEncodedLimit: "50mb",
+                jsonLimit: "1mb",
+                urlEncodedLimit: "1mb",
                 prefix: "",
                 autoListen: true,
                 openapi: {
@@ -153,8 +178,8 @@ export class Sprint {
             this.routesPath = finalConfig.routesPath || "./src/routes";
             this.middlewaresPath = finalConfig.middlewaresPath || "./src/middlewares";
             this.cronjobsPath = finalConfig.cronjobsPath || "./src/cronjobs";
-            this.jsonLimit = finalConfig.jsonLimit || "50mb";
-            this.urlEncodedLimit = finalConfig.urlEncodedLimit || "50mb";
+            this.jsonLimit = finalConfig.jsonLimit || "1mb";
+            this.urlEncodedLimit = finalConfig.urlEncodedLimit || "1mb";
             this.prefix = finalConfig.prefix ? ("/" + finalConfig.prefix.replace(/^\/+|\/+$/g, "")) : "";
             this.openapi = {
                 generateOnBuild: isEnabledInEnv(finalConfig.openapi?.generateOnBuild),
@@ -173,6 +198,13 @@ export class Sprint {
                 }
             };
             this.fileMemoryUploadedLimit = finalConfig.fileMemoryUploadedLimit || 5 * 1024 * 1024;
+            this.corsConfig = (finalConfig as any).cors ?? false;
+            this.securityConfig = (finalConfig as any).security ?? {};
+            this.contextConfig = (finalConfig as any).context ?? {};
+            this.errorHandlerConfig = (finalConfig as any).errorHandler ?? {};
+            this.shutdownConfig = (finalConfig as any).shutdown ?? {};
+            this.livenessPath = (finalConfig as any).livenessPath ?? "/healthz";
+            this.readinessPath = (finalConfig as any).readinessPath ?? "/readyz";
 
             const openApiPath = this.openapi.path;
             const swaggerPath = this.openapi.swaggerUi.path;
@@ -270,9 +302,22 @@ export class Sprint {
                 }
 
                 this.loadNotFound();
-                if (finalConfig.autoListen) this.listen();
-            });
-        });
+                if (finalConfig.autoListen) {
+                    try {
+                        await initResources();
+                    } catch (err) {
+                        this.rejectReady(err as Error);
+                        console.error("[Sprint] Resource initialization failed:", err);
+                        process.exit(1);
+                    }
+                    this.listen();
+                } else {
+                    // No autoListen: ready resolves once routes/middlewares are loaded.
+                    // The user is expected to create+listen on the http.Server themselves.
+                    this.resolveReady();
+                }
+            }).catch((err) => this.rejectReady(err));
+        }).catch((err) => this.rejectReady(err));
     };
 
     private async init(): Promise<void> {
@@ -328,6 +373,8 @@ export class Sprint {
     private loadDefaults(): void {
         this.app.disable("x-powered-by");
 
+        if (this.contextConfig !== false) this.app.use(createContextMiddleware(this.contextConfig));
+
         this.app.use((req: Request, res, next) => {
             const getAuthorization = (sources?: AuthorizationSource | AuthorizationSource[]): string | undefined => {
                 const defaultSources: AuthorizationSource[] = ["query:token", "headers:authorization"];
@@ -354,21 +401,14 @@ export class Sprint {
             next();
         });
 
-        this.app.use((_, res, next) => {
-            res.setHeader("Content-Security-Policy", "default-src 'self'");
-            res.setHeader("X-Content-Type-Options", "nosniff");
-            res.setHeader("X-Frame-Options", "DENY");
-            res.setHeader("X-XSS-Protection", "1; mode=block");
-            res.setHeader("X-Powered-By", "Sprint");
-            return next();
-        });
+        if (this.securityConfig !== false) this.app.use(createSecurityHeadersMiddleware(this.securityConfig));
 
         this.app.set("port", this.port || process.env.PORT || 5000);
         this.app.set("json spaces", 2);
         this.app.enable("trust proxy");
         this.app.set("trust proxy", true);
 
-        this.app.use(cors());
+        if (this.corsConfig !== false) this.app.use(createCorsMiddleware(this.corsConfig));
         this.app.use(morgan("combined"));
         this.app.use(express.json({ limit: this.jsonLimit }));
         this.app.use(express.urlencoded({ limit: this.urlEncodedLimit, extended: false }));
@@ -443,17 +483,36 @@ export class Sprint {
     };
 
     private loadHealthcheck(): void {
-        const healthRoutes = this.prefix ? [`${this.prefix}/health`, `${this.prefix}/healthcheck`] : ["/health", "/healthcheck"];
+        const liveness = this.livenessPath !== false ? this.livenessPath : null;
+        const readiness = this.readinessPath !== false ? this.readinessPath : null;
 
-        this.app.get(healthRoutes, (_, res) => {
-            const healthcheckXml = `<?xml version="1.0" encoding="UTF-8"?>
-<health>
-    <status>ok</status>
-    <uptime>${process.uptime().toFixed(2)}</uptime>
-</health>`;
+        if (liveness) {
+            const path = this.prefix ? `${this.prefix}${liveness}` : liveness;
+            this.app.get(path, (_, res) => {
+                res.json({ status: "ok", uptime: process.uptime() });
+            });
+        }
 
-            res.setHeader("Content-Type", "application/xml");
-            res.send(healthcheckXml);
+        if (readiness) {
+            const path = this.prefix ? `${this.prefix}${readiness}` : readiness;
+            this.app.get(path, async (_, res) => {
+                if (isShuttingDown()) {
+                    res.status(503).json({ status: "shutting_down", ready: false });
+                    return;
+                }
+                const result = await checkReadiness();
+                res.status(result.ready ? 200 : 503).json({
+                    status: result.ready ? "ok" : "not_ready",
+                    ready: result.ready,
+                    resources: result.resources
+                });
+            });
+        }
+
+        // Legacy /health and /healthcheck (deprecated, kept for back-compat in v1 → v2 transition).
+        const legacy = this.prefix ? [`${this.prefix}/health`, `${this.prefix}/healthcheck`] : ["/health", "/healthcheck"];
+        this.app.get(legacy, (_, res) => {
+            res.json({ status: "ok", uptime: process.uptime(), deprecated: true, hint: "Use /healthz (liveness) and /readyz (readiness)" });
         });
     };
 
@@ -597,35 +656,25 @@ export class Sprint {
     };
 
     private loadNotFound(): void {
-        this.app.use((req, res, _next) => {
-            const originalSend = res.send.bind(res);
-            const sendWrapper = (body?: any) => {
-                if (res.statusCode === 404) {
-                    const key = `user:${req.ip}:404`;
-                    limiter.check({
-                        key,
-                        limit: 5,
-                        interval: "10s",
-                        blockDuration: "1m",
-                        storage: "memory"
-                    }).then((result: { success: boolean; remaining: number; limit: number; reset: number; }) => {
-                        if (!result.success) {
-                            console.log(`[RateLimiter] 404 limit reached for ${req.ip}. Retry at ${new Date(result.reset).toLocaleTimeString()}`);
-                            res.status(429).send("Too many invalid requests. Try again later.");
-                        } else {
-                            console.log(`[RateLimiter] 404 allowed for ${req.ip}. Remaining: ${result.remaining}/${result.limit}`);
-                            originalSend(body);
-                        }
-                    }).catch((err: Error) => {
-                        console.error("[RateLimiter] Error checking limit:", err);
-                        originalSend(body);
-                    });
-                } else originalSend(body);
-            };
-
-            res.send = sendWrapper as typeof res.send;
-            res.status(404).send("Not Found");
+        this.app.use(async (req, _res, next) => {
+            const key = `user:${req.ip}:404`;
+            try {
+                const result = await limiter.check({
+                    key,
+                    limit: 5,
+                    interval: "10s",
+                    blockDuration: "1m",
+                    storage: "memory"
+                });
+                if (!result.success) {
+                    next(new NotFoundError("Too many invalid requests", { code: "TOO_MANY_REQUESTS", expose: true }));
+                    return;
+                }
+            } catch { /* swallow rate-limit errors */ }
+            next(new NotFoundError(`Route not found: ${req.method} ${req.originalUrl}`));
         });
+
+        if (this.errorHandlerConfig !== false) this.app.use(createErrorHandler(this.errorHandlerConfig));
     };
 
     /** Applies prefix to a path */
@@ -810,100 +859,15 @@ export class Sprint {
     };
 
     private zodSchemaToOpenAPI(schema: any): any {
-        if (!schema) return {};
-
-        // Handle ZodObject
-        if (schema._def?.typeName === "ZodObject" || schema.shape) {
-            const shape = schema.shape || schema._def?.shape();
-            if (!shape) return {};
-
-            const properties: any = {};
-            const required: string[] = [];
-
-            for (const [key, value] of Object.entries(shape)) {
-                const zodDef = (value as any)._def;
-                const typeName = zodDef?.typeName;
-
-                let propSchema: any = {};
-
-                if (typeName === "ZodString") propSchema = { type: "string" };
-                else if (typeName === "ZodNumber") propSchema = { type: "number" };
-                else if (typeName === "ZodBoolean") propSchema = { type: "boolean" };
-                else if (typeName === "ZodArray") propSchema = { type: "array", items: this.zodSchemaToOpenAPI(zodDef?.type) };
-                else if (typeName === "ZodObject") propSchema = this.zodSchemaToOpenAPI(zodDef?.type);
-                else if (typeName === "ZodOptional") continue;
-                else propSchema = { type: "string" };
-
-                properties[key] = propSchema;
-
-                // Check if required (not optional).
-                if (!zodDef?.isOptional && typeName !== "ZodOptional") required.push(key);
-            }
-
-            return { type: "object", properties, required: required.length > 0 ? required : undefined };
-        }
-
-        return {};
+        return zodToOpenAPI(schema);
     };
 
     private zodParamsToOpenAPI(schema: any): any[] {
-        if (!schema) return [];
-
-        const params: any[] = [];
-        const shape = schema.shape || schema._def?.shape();
-
-        if (!shape) return [];
-
-        for (const [key, value] of Object.entries(shape)) {
-            const zodDef = (value as any)._def;
-            const typeName = zodDef?.typeName;
-
-            let paramSchema: any = {};
-
-            if (typeName === "ZodString") paramSchema = { type: "string" };
-            else if (typeName === "ZodNumber") paramSchema = { type: "number" };
-            else if (typeName === "ZodBoolean") paramSchema = { type: "boolean" };
-            else paramSchema = { type: "string" };
-
-            params.push({
-                name: key,
-                in: "query",
-                required: !zodDef?.isOptional,
-                schema: paramSchema
-            });
-        }
-
-        return params;
+        return zodObjectToParams(schema, "query");
     };
 
     private zodHeadersToOpenAPI(schema: any): any[] {
-        if (!schema) return [];
-
-        const headers: any[] = [];
-        const shape = schema.shape || schema._def?.shape();
-
-        if (!shape) return [];
-
-        for (const [key, value] of Object.entries(shape)) {
-            const zodDef = (value as any)._def;
-            const typeName = zodDef?.typeName;
-
-            let paramSchema: any = {};
-
-            if (typeName === "ZodString") paramSchema = { type: "string" };
-            else if (typeName === "ZodNumber") paramSchema = { type: "number" };
-            else if (typeName === "ZodBoolean") paramSchema = { type: "boolean" };
-            else paramSchema = { type: "string" };
-
-            headers.push({
-                name: key,
-                in: "header",
-                required: !zodDef?.isOptional,
-                schema: paramSchema
-            });
-        }
-
-        return headers;
+        return zodObjectToParams(schema, "header");
     };
 
     // HTTP Methods (prefix is applied automatically).
@@ -928,6 +892,19 @@ export class Sprint {
         this.graphqlSchema = schema;
     };
 
+    /**
+     * Resolves with the underlying http.Server once it's listening.
+     * Use this to attach WebSocket / extra protocols without races.
+     *
+     * @example
+     * const server = await app.onListen();
+     * await attachWebSocket({ server, handlers: { "/ws/chat": chatHandler } });
+     */
+    public onListen(): Promise<http.Server> {
+        if (this.server && this.server.listening) return Promise.resolve(this.server);
+        return new Promise((resolve) => this.listeningResolvers.push(resolve));
+    };
+
     public listen(callback?: () => void): void {
         const isDev = process.env.NODE_ENV === "development";
         const basePort = this.app.get("port") || 5000;
@@ -937,10 +914,15 @@ export class Sprint {
         const tryListen = (port: number): void => {
             triedPorts.push(port);
 
-            this.server = http.createServer(this.app);
+            const srv = http.createServer(this.app);
+            this.server = srv;
 
-            this.server.listen(port, () => {
+            srv.listen(port, () => {
                 serverStarted = true;
+                if (this.shutdownConfig !== false) bindShutdownSignals(srv, this.shutdownConfig);
+                this.resolveReady();
+                for (const r of this.listeningResolvers) try { r(srv); } catch { /* ignore */ }
+                this.listeningResolvers.length = 0;
                 const prefixInfo = this.prefix ? this.prefix : "/";
                 const reset = "\x1b[0m";
                 const bold = "\x1b[1m";
@@ -953,7 +935,8 @@ export class Sprint {
                 console.log("");
                 console.log(`   ${dim}Local:${reset}                http://localhost:${bold}${port}${reset}`);
                 console.log(`   ${dim}Prefix:${reset}               ${bold}${prefixInfo}${reset}`);
-                console.log(`   ${dim}Healthcheck:${reset}          http://localhost:${port}/healthcheck ${dim}(also available at /health)${reset}`);
+                if (this.livenessPath) console.log(`   ${dim}Liveness:${reset}             http://localhost:${port}${this.livenessPath}`);
+                if (this.readinessPath) console.log(`   ${dim}Readiness:${reset}            http://localhost:${port}${this.readinessPath}`);
                 console.log("");
                 console.log(`   ${dim}Loaded routes:${reset}        ${bold}${this.counters.routes}${reset}`);
                 console.log(`   ${dim}Loaded middlewares:${reset}   ${bold}${this.counters.middlewares}${reset}`);
@@ -971,7 +954,7 @@ export class Sprint {
                 console.log("");
             });
 
-            this.server.on("error", (err: NodeJS.ErrnoException) => {
+            srv.on("error", (err: NodeJS.ErrnoException) => {
                 if (err.code === "EADDRINUSE" && isDev && !serverStarted) {
                     const nextPort = triedPorts.length === 1 ? 3000 : triedPorts[triedPorts.length - 1] + 1;
                     if (nextPort > 10000) {
@@ -979,7 +962,7 @@ export class Sprint {
                         process.exit(1);
                     }
                     console.log(`⚠️  Port ${port} in use, trying ${nextPort}...`);
-                    this.server.close();
+                    srv.close();
                     tryListen(nextPort);
                 } else if (!serverStarted) {
                     console.error(`❌ Server error:`, err.message);

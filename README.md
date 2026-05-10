@@ -118,14 +118,40 @@ docker compose up -d
 | Token pairs (access + refresh tokens)                                 | 🟢 Active      |
 | CronJobs scheduler with node-cron                                      | 🟢 Active      |
 | Agnostic Telemetry (OpenTelemetry, Sentry, GlitchTip, Discord, Telegram, Nodemailer...)                       | 🟢 Active      |
+| Typed `HttpError` hierarchy + global error envelope                    | 🟢 Active      |
+| `X-Request-ID` + W3C `traceparent` propagation (AsyncLocalStorage)     | 🟢 Active      |
+| Graceful shutdown + `/healthz` + `/readyz` (K8s probes)                | 🟢 Active      |
+| Resource lifecycle registry (`registerResource`, `defineDb`)           | 🟢 Active      |
+| Secure-by-default CORS (allowlist) + helmet-equivalent headers         | 🟢 Active      |
+| Cache module (in-memory LRU + Redis adapter)                           | 🟢 Active      |
+| Queue + DLQ + retries + idempotency (in-memory + BullMQ)               | 🟢 Active      |
+| Pub/Sub (in-memory + Redis)                                            | 🟢 Active      |
+| Server-Sent Events (SSE) helper                                        | 🟢 Active      |
+| WebSocket integration (`ws` peer dep)                                  | 🟢 Active      |
+| Worker thread pool helper                                              | 🟢 Active      |
+| Env validation (Zod, fail-fast)                                        | 🟢 Active      |
+| Per-route body-size limits                                             | 🟢 Active      |
+| CSRF middleware (double-submit cookie)                                 | 🟢 Active      |
+| Idempotency middleware                                                 | 🟢 Active      |
+| Circuit breaker (closed / open / half-open)                            | 🟢 Active      |
+| Service discovery (in-memory + adapter API)                            | 🟢 Active      |
+| Feature flags (static / env / file / composite)                        | 🟢 Active      |
+| tRPC adapter (peer dep `@trpc/server`)                                 | 🟢 Active      |
+| gRPC server adapter (peer dep `@grpc/grpc-js`)                         | 🟢 Active      |
+| HTTP client with retry + circuit breaker + trace propagation           | 🟢 Active      |
+| Pagination + filter + sort helpers (offset & cursor)                   | 🟢 Active      |
+| Secrets manager (env / file / memoized / composite)                    | 🟢 Active      |
+| OpenAPI converter (full Zod coverage: enums, unions, refines, formats) | 🟢 Active      |
 
 
 <details>
   <summary>Default routes reserved for Sprint</summary>
 
 ```
- - /health
- - /healthcheck
+ - /healthz       (liveness)
+ - /readyz        (readiness)
+ - /health        (deprecated alias)
+ - /healthcheck   (deprecated)
  - /openapi.json
  - /swagger
  - /graphql
@@ -382,5 +408,309 @@ setUser({ id: "123", email: "user@example.com", username: "john" });
 ```
 
 More info: https://docs.tpeoficial.com/docs/sprint/telemetry (Link not yet available)
+
+## Modules
+
+### Errors + global error handler
+
+```ts
+import { BadRequestError, NotFoundError, asyncHandler } from "sprint-es/errors";
+
+router.get("/users/:id", asyncHandler(async (req, res) => {
+    const user = await db.users.find(req.params.id);
+    if (!user) throw new NotFoundError("User not found");
+    res.json(user);
+}));
+```
+
+Response envelope (auto):
+```json
+{ "error": { "code": "NOT_FOUND", "message": "User not found", "status": 404, "requestId": "..." } }
+```
+
+### Request context (correlation + traceparent)
+
+```ts
+import { getRequestId, getTraceId, getContext } from "sprint-es/context";
+
+logger.info({ requestId: getRequestId(), traceId: getTraceId() }, "request handled");
+```
+
+Headers `X-Request-ID` and W3C `traceparent` are read from the incoming request and re-emitted on the response. AsyncLocalStorage exposes them anywhere downstream.
+
+### Graceful shutdown + readiness
+
+```ts
+import { onShutdown, registerResource } from "sprint-es/lifecycle";
+
+registerResource("redis", {
+    init: async () => redis.connect(),
+    close: async () => redis.quit(),
+    ready: async () => redis.status === "ready"
+});
+
+onShutdown(async () => { await drainBackgroundJobs(); });
+```
+
+`/readyz` returns 503 while shutting down or while any resource reports `ready: false`. SIGTERM/SIGINT close HTTP, run shutdown hooks LIFO, close resources, then exit.
+
+### Secure CORS + headers (defaults)
+
+```ts
+// sprint.config.ts
+export default {
+    cors: { origin: ["https://app.example.com"], credentials: true },
+    security: { hsts: { maxAge: 63072000, preload: true } }
+};
+```
+
+Default = no CORS (deny all), HSTS, COOP/CORP, Frame-Options, no `X-XSS-Protection` (deprecated). CSP is HTML-only.
+
+### Cache
+
+```ts
+import { defineCache, MemoryCache, RedisCache } from "sprint-es/cache";
+import Redis from "ioredis";
+
+export const cache = defineCache({
+    name: "main",
+    adapter: process.env.REDIS_URL
+        ? new RedisCache({ client: new Redis(process.env.REDIS_URL) })
+        : new MemoryCache({ maxEntries: 10_000 })
+});
+
+await cache.set("user:1", { name: "Ada" }, 60_000);
+```
+
+### Queues + pub/sub + DLQ + idempotency
+
+```ts
+import { defineQueue, MemoryQueue, BullMQQueue } from "sprint-es/queue";
+import { Queue, Worker } from "bullmq";
+
+export const emails = defineQueue({
+    name: "emails",
+    adapter: new BullMQQueue({
+        queue: new Queue("emails", { connection }),
+        workerFactory: (proc) => new Worker("emails", proc, { connection })
+    })
+});
+
+emails.process(async (job) => sendEmail(job.data));
+await emails.add("welcome", { to: "ada@x.com" }, {
+    idempotencyKey: "welcome:user:1",
+    attempts: 5,
+    backoff: { type: "exponential", delay: 1000, maxDelay: 30_000 }
+});
+```
+
+### SSE
+
+```ts
+import { createSSEStream } from "sprint-es/sse";
+
+router.get("/events", async (req, res) => {
+    const stream = createSSEStream(req, res);
+    const interval = setInterval(() => stream.send({ event: "tick", data: { now: Date.now() } }), 1000);
+    await stream.done;
+    clearInterval(interval);
+});
+```
+
+### WebSocket
+
+```ts
+import { attachWebSocket } from "sprint-es/ws";
+
+await attachWebSocket({
+    server: app.server,
+    handlers: {
+        "/ws/chat": {
+            onConnection: (socket) => {
+                socket.on("message", (m) => socket.send(`echo: ${m}`));
+            }
+        }
+    }
+});
+```
+
+### Worker pool (CPU-bound offload)
+
+```ts
+import { defineWorkerPool } from "sprint-es/workers";
+
+const pool = defineWorkerPool({ file: "./workers/hash.js", size: 4 });
+const result = await pool.run({ password: "..." });
+```
+
+### Env validation (fail-fast at boot)
+
+```ts
+import { defineEnv } from "sprint-es/env";
+import { z } from "zod";
+
+export const env = defineEnv({
+    schema: z.object({
+        PORT: z.string().transform(Number).pipe(z.number().int().positive()),
+        DATABASE_URL: z.string().url(),
+        REDIS_URL: z.string().url().optional()
+    })
+});
+```
+
+### CSRF + idempotency
+
+```ts
+import { defineMiddleware } from "sprint-es";
+import { createCsrfMiddleware } from "sprint-es/csrf";
+import { createIdempotencyMiddleware } from "sprint-es/idempotency";
+import { cache } from "./cache";
+
+export default defineMiddleware({
+    name: "guards",
+    include: "/api/**",
+    handler: [
+        createCsrfMiddleware({ cookie: { sameSite: "strict", secure: true } }),
+        createIdempotencyMiddleware({ cache, ttlMs: 24 * 60 * 60 * 1000 })
+    ]
+});
+```
+
+### Circuit breaker
+
+```ts
+import { CircuitBreaker } from "sprint-es/circuit-breaker";
+
+const callPayments = new CircuitBreaker(
+    async (orderId: string) => paymentsApi.charge(orderId),
+    {
+        failureThreshold: 5,
+        successThreshold: 2,
+        resetTimeoutMs: 30_000,
+        callTimeoutMs: 3_000,
+        fallback: () => ({ status: "queued" })
+    }
+);
+
+const result = await callPayments.fire("order-1");
+```
+
+### Service discovery
+
+```ts
+import { selfRegister, getDefaultDiscovery } from "sprint-es/discovery";
+
+await selfRegister({
+    id: `auth-${process.pid}`,
+    name: "auth",
+    address: "10.0.0.42",
+    port: Number(process.env.PORT) || 5000
+}, { heartbeatMs: 5_000 });
+
+const instances = await getDefaultDiscovery().discover("auth");
+```
+
+### Feature flags
+
+```ts
+import { configureFlags, flag, CompositeFlagProvider, EnvFlagProvider, FileFlagProvider } from "sprint-es/flags";
+
+configureFlags(new CompositeFlagProvider([
+    new EnvFlagProvider(),                            // SPRINT_FLAG_NEW_CHECKOUT=1 wins
+    new FileFlagProvider({ path: "./flags.json" })    // hot-reloads on file change
+]));
+
+if (await flag("new-checkout", false, { userId: req.user.id })) { /* ... */ }
+```
+
+### tRPC
+
+```ts
+import { attachTrpc } from "sprint-es/trpc";
+import { appRouter } from "./trpc/router";
+
+await attachTrpc({
+    app: app.app,
+    path: "/trpc",
+    router: appRouter,
+    createContext: ({ req }) => ({ user: req.custom.user })
+});
+```
+
+### gRPC
+
+```ts
+import { createGrpcServer } from "sprint-es/grpc";
+import { authService } from "./grpc/auth";
+
+await createGrpcServer({
+    address: "0.0.0.0:50051",
+    services: [authService]
+});
+```
+
+### HTTP client (retry + circuit + trace propagation)
+
+```ts
+import { createHttpClient } from "sprint-es/http-client";
+
+const api = createHttpClient({
+    baseUrl: "https://payments.internal",
+    timeoutMs: 5_000,
+    retries: 2,
+    backoff: { type: "exponential", delay: 200, maxDelay: 2_000 },
+    circuit: { failureThreshold: 10, resetTimeoutMs: 30_000 }
+});
+
+const res = await api.post("/charge", { json: { amount: 99 } });
+```
+
+`X-Request-ID` and W3C `traceparent` from the current Sprint request context are forwarded automatically.
+
+### Pagination + filter + sort
+
+```ts
+import {
+    parseOffsetPagination, offsetEnvelope,
+    parseCursorPagination, cursorEnvelope,
+    parseFilters, parseSort
+} from "sprint-es/pagination";
+
+router.get("/users", asyncHandler(async (req, res) => {
+    const page = parseOffsetPagination(req, { defaultLimit: 20, maxLimit: 100 });
+    const filters = parseFilters(req, { allowedFields: ["status", "createdAt"] });
+    const sort = parseSort(req, { allowedFields: ["name", "createdAt"], defaultSort: [{ field: "createdAt", direction: "desc" }] });
+
+    const { rows, total } = await db.users.find({ filters, sort, limit: page.limit, offset: page.offset });
+    res.json(offsetEnvelope(rows, page, total));
+}));
+```
+
+Filter syntax: `?filter=age>=18,status:in:active|pending,name:like:ada`. Fields not in `allowedFields` are silently dropped.
+
+### Secrets
+
+```ts
+import { configureSecrets, secret, CompositeSecretProvider, EnvSecretProvider, FileSecretProvider, MemoizedSecretProvider } from "sprint-es/secrets";
+
+configureSecrets(new MemoizedSecretProvider({
+    inner: new CompositeSecretProvider([
+        new FileSecretProvider({ path: "/run/secrets/app.env", watch: true }),
+        new EnvSecretProvider()
+    ]),
+    ttlMs: 60_000
+}));
+
+const dbPassword = await secret("DB_PASSWORD", { required: true });
+```
+
+## Defaults to be aware of
+
+- Health probes are split: `/healthz` (liveness) and `/readyz` (readiness). `/health` and `/healthcheck` remain as deprecated aliases.
+- Default JSON / urlencoded body limit is `1mb`. Override via `jsonLimit` / `urlEncodedLimit` in `sprint.config.ts`, or per-route with `createBodyLimit`.
+- CORS is **deny-all by default**. Set `cors: { origin: [...] }` to allowlist.
+- `X-XSS-Protection` is not emitted (deprecated by browsers).
+- 404 responses go through the global error handler (consistent JSON envelope) — not plain text.
+- All peer deps are optional: `bullmq`, `ioredis`, `ws`, `@trpc/server`, `@grpc/grpc-js`. Install only the ones you use.
 
 <p align="right"><a href="#top">Back to top 🔼</a></p>
